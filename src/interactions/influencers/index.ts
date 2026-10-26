@@ -114,9 +114,30 @@ async function assignCreatorRole(reviewer: GuildMember, discordId: string): Prom
   const guild = reviewer.guild;
   const candidate = await fetchMemberSafe(guild, discordId);
   if (candidate === null) {
+    const inviteUrl = getEnv().DISCORD_STORE_INVITE_URL;
+    let inviteSent = false;
+    if (inviteUrl !== null) {
+      try {
+        const user = await reviewer.client.users.fetch(discordId);
+        const dm = await user.createDM();
+        await sendV2(
+          dm,
+          warningContainer(
+            `Sua inscrição para o programa de creators da Vook Store foi analisada, mas você ainda não está em nosso servidor.\n\nEntre pelo convite oficial e avise a equipe para concluir sua aprovação:\n${inviteUrl}`,
+            { title: 'ENTRE NO DISCORD DA VOOK STORE', footer: 'Vook Store • Programa de creators' },
+          ),
+        );
+        inviteSent = true;
+      } catch {
+        // A resposta ao avaliador abaixo informa quando a DM esta bloqueada.
+      }
+    }
     throw new ValidationError('Candidato aprovado nao esta no servidor.', {
-      userMessage:
-        'Não foi possível aprovar: o candidato não está no servidor da Vook Store.',
+      userMessage: inviteSent
+        ? 'O candidato ainda não está no servidor. Enviei o convite por DM; tente aprovar novamente depois que ele entrar.'
+        : inviteUrl === null
+          ? 'O candidato não está no servidor e DISCORD_STORE_INVITE_URL ainda não foi configurado.'
+          : 'O candidato não está no servidor e não aceita DMs. Envie o convite por outro meio.',
       context: { discordId, guildId: guild.id },
     });
   }

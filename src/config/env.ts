@@ -31,6 +31,8 @@ export interface AppEnv {
   ALERT_CHANNEL_ID: string | null;
   /** Canal interno que recebe as inscricoes enviadas pelo site publico. */
   INFLUENCER_APPROVAL_CHANNEL_ID: string | null;
+  /** Convite oficial enviado a candidatos aprovados que ainda nao estao no servidor. */
+  DISCORD_STORE_INVITE_URL: string | null;
   TWITCH_CLIENT_ID: string | null;
   TWITCH_CLIENT_SECRET: string | null;
   TWITCH_ANNOUNCEMENT_CHANNEL_ID: string | null;
@@ -211,6 +213,16 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     }
   }
 
+  const storeInviteRaw = readString(source, 'DISCORD_STORE_INVITE_URL');
+  let storeInviteUrl: string | null = null;
+  if (storeInviteRaw.length > 0) {
+    if (!/^https:\/\/(discord\.gg|discord\.com\/invite)\/[a-z0-9-]+\/?$/i.test(storeInviteRaw)) {
+      problems.push('DISCORD_STORE_INVITE_URL deve ser um convite https valido do Discord.');
+    } else {
+      storeInviteUrl = storeInviteRaw.replace(/\/$/, '');
+    }
+  }
+
   const twitchClientId = readString(source, 'TWITCH_CLIENT_ID');
   const twitchClientSecret = readString(source, 'TWITCH_CLIENT_SECRET');
   const twitchAnnouncementRaw = readString(source, 'TWITCH_ANNOUNCEMENT_CHANNEL_ID');
@@ -256,6 +268,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     TRANSCRIPT_RETENTION_DAYS: transcriptRetentionDays,
     ALERT_CHANNEL_ID: alertChannelId,
     INFLUENCER_APPROVAL_CHANNEL_ID: influencerApprovalChannelId,
+    DISCORD_STORE_INVITE_URL: storeInviteUrl,
     TWITCH_CLIENT_ID: twitchClientId || null,
     TWITCH_CLIENT_SECRET: twitchClientSecret || null,
     TWITCH_ANNOUNCEMENT_CHANNEL_ID: twitchAnnouncementRaw || null,
