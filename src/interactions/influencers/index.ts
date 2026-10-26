@@ -38,6 +38,7 @@ import { fetchMemberSafe } from '../../utils/discord';
 
 const DISCORD_SNOWFLAKE = /^\d{17,20}$/;
 const DEFAULT_APPROVAL_CHANNEL_ID = '1564371577686986782';
+const DEFAULT_STORE_INVITE_URL = 'https://discord.gg/8xW8PNaXhy';
 const CREATOR_ROLE_ID = '1405241505467338843';
 const processingMessages = new Set<string>();
 
@@ -114,7 +115,7 @@ async function assignCreatorRole(reviewer: GuildMember, discordId: string): Prom
   const guild = reviewer.guild;
   const candidate = await fetchMemberSafe(guild, discordId);
   if (candidate === null) {
-    const inviteUrl = getEnv().DISCORD_STORE_INVITE_URL;
+    const inviteUrl = getEnv().DISCORD_STORE_INVITE_URL ?? DEFAULT_STORE_INVITE_URL;
     let inviteSent = false;
     if (inviteUrl !== null) {
       try {
@@ -135,9 +136,7 @@ async function assignCreatorRole(reviewer: GuildMember, discordId: string): Prom
     throw new ValidationError('Candidato aprovado nao esta no servidor.', {
       userMessage: inviteSent
         ? 'O candidato ainda não está no servidor. Enviei o convite por DM; tente aprovar novamente depois que ele entrar.'
-        : inviteUrl === null
-          ? 'O candidato não está no servidor e DISCORD_STORE_INVITE_URL ainda não foi configurado.'
-          : 'O candidato não está no servidor e não aceita DMs. Envie o convite por outro meio.',
+        : 'O candidato não está no servidor e não aceita DMs. Envie o convite por outro meio.',
       context: { discordId, guildId: guild.id },
     });
   }
