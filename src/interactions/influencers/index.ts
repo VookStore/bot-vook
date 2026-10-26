@@ -28,6 +28,7 @@ import { assertCanManageOrders } from '../../core/permissions/PermissionService'
 import type { ButtonHandler } from '../../types';
 
 const DISCORD_SNOWFLAKE = /^\d{17,20}$/;
+const DEFAULT_APPROVAL_CHANNEL_ID = '1564371577686986782';
 const processingMessages = new Set<string>();
 
 function decisionRow(discordId: string, decision: 'approved' | 'rejected') {
@@ -62,8 +63,9 @@ async function assertCanReview(interaction: ButtonInteraction): Promise<GuildMem
       userMessage: 'Esta ação só pode ser realizada no servidor da loja.',
     });
   }
-  const configuredChannel = getEnv().INFLUENCER_APPROVAL_CHANNEL_ID;
-  if (configuredChannel === null || interaction.channelId !== configuredChannel) {
+  const configuredChannel =
+    getEnv().INFLUENCER_APPROVAL_CHANNEL_ID ?? DEFAULT_APPROVAL_CHANNEL_ID;
+  if (interaction.channelId !== configuredChannel) {
     throw new PermissionError('Decisao de influencer fora do canal configurado.', {
       userMessage: 'Este botão não pertence ao canal oficial de aprovações.',
       context: { channelId: interaction.channelId, guildId: interaction.guildId },

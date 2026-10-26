@@ -8,6 +8,7 @@ const env_1 = require("../../config/env");
 const errors_1 = require("../../core/errors");
 const PermissionService_1 = require("../../core/permissions/PermissionService");
 const DISCORD_SNOWFLAKE = /^\d{17,20}$/;
+const DEFAULT_APPROVAL_CHANNEL_ID = '1564371577686986782';
 const processingMessages = new Set();
 function decisionRow(discordId, decision) {
     return new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
@@ -36,8 +37,8 @@ async function assertCanReview(interaction) {
             userMessage: 'Esta ação só pode ser realizada no servidor da loja.',
         });
     }
-    const configuredChannel = (0, env_1.getEnv)().INFLUENCER_APPROVAL_CHANNEL_ID;
-    if (configuredChannel === null || interaction.channelId !== configuredChannel) {
+    const configuredChannel = (0, env_1.getEnv)().INFLUENCER_APPROVAL_CHANNEL_ID ?? DEFAULT_APPROVAL_CHANNEL_ID;
+    if (interaction.channelId !== configuredChannel) {
         throw new errors_1.PermissionError('Decisao de influencer fora do canal configurado.', {
             userMessage: 'Este botão não pertence ao canal oficial de aprovações.',
             context: { channelId: interaction.channelId, guildId: interaction.guildId },
