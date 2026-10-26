@@ -145,6 +145,16 @@ function loadEnv(source = process.env) {
             influencerApprovalChannelId = influencerChannelRaw;
         }
     }
+    const twitchClientId = readString(source, 'TWITCH_CLIENT_ID');
+    const twitchClientSecret = readString(source, 'TWITCH_CLIENT_SECRET');
+    const twitchAnnouncementRaw = readString(source, 'TWITCH_ANNOUNCEMENT_CHANNEL_ID');
+    const twitchParts = [twitchClientId, twitchClientSecret, twitchAnnouncementRaw];
+    if (twitchParts.some(Boolean) && !twitchParts.every(Boolean)) {
+        problems.push('TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET e TWITCH_ANNOUNCEMENT_CHANNEL_ID devem ser definidos juntos.');
+    }
+    if (twitchAnnouncementRaw.length > 0 && !SNOWFLAKE_PATTERN.test(twitchAnnouncementRaw)) {
+        problems.push('TWITCH_ANNOUNCEMENT_CHANNEL_ID deve ser um ID de canal do Discord.');
+    }
     const pgDumpPath = readString(source, 'PG_DUMP_PATH');
     const nodeEnvRaw = (readString(source, 'NODE_ENV') || 'production').toLowerCase();
     if (!NODE_ENVS.includes(nodeEnvRaw)) {
@@ -172,6 +182,9 @@ function loadEnv(source = process.env) {
         TRANSCRIPT_RETENTION_DAYS: transcriptRetentionDays,
         ALERT_CHANNEL_ID: alertChannelId,
         INFLUENCER_APPROVAL_CHANNEL_ID: influencerApprovalChannelId,
+        TWITCH_CLIENT_ID: twitchClientId || null,
+        TWITCH_CLIENT_SECRET: twitchClientSecret || null,
+        TWITCH_ANNOUNCEMENT_CHANNEL_ID: twitchAnnouncementRaw || null,
         BACKUP_ENABLED: backupEnabled,
         BACKUP_DIR: backupDir,
         BACKUP_RETENTION: retention,

@@ -197,6 +197,7 @@ exports.SCHEDULER_INTERVALS = {
      * de concentrar centenas de DELETEs numa unica passagem.
      */
     TRANSCRIPT_RETENTION_MS: 3_600_000,
+    TWITCH_LIVE_CHECK_MS: 120_000,
 };
 /**
  * Retencao dos transcripts hospedados.

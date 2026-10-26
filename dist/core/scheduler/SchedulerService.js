@@ -18,6 +18,7 @@ const CartReminderService_1 = require("../../modules/catalog/services/CartRemind
 const BackupService_1 = require("../../modules/system/services/BackupService");
 const TicketPriorityService_1 = require("../../modules/tickets/services/TicketPriorityService");
 const TranscriptRetentionService_1 = require("../../modules/tickets/services/TranscriptRetentionService");
+const TwitchLiveService_1 = require("../../modules/influencers/services/TwitchLiveService");
 /**
  * Agendador de jobs.
  *
@@ -148,6 +149,15 @@ const transcriptRetentionJob = {
         await (0, TranscriptRetentionService_1.purgeExpiredTranscripts)();
     },
 };
+const twitchLiveJob = {
+    name: 'TwitchLiveJob',
+    intervalMs: limits_1.SCHEDULER_INTERVALS.TWITCH_LIVE_CHECK_MS,
+    async run() {
+        const client = (0, clientHolder_1.tryGetClient)();
+        if (client !== null)
+            await (0, TwitchLiveService_1.announceTwitchLives)(client);
+    },
+};
 /** Limpeza de estruturas em memoria. */
 const maintenanceJob = {
     name: 'MaintenanceJob',
@@ -174,6 +184,7 @@ const JOBS = [
     priorityEscalationJob,
     cartReminderJob,
     transcriptRetentionJob,
+    twitchLiveJob,
     backupJob,
     maintenanceJob,
 ];

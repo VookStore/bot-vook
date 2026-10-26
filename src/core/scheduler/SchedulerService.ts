@@ -15,6 +15,7 @@ import { remindAbandonedCarts } from '../../modules/catalog/services/CartReminde
 import { runBackupIfDue } from '../../modules/system/services/BackupService';
 import { escalateStaleTickets } from '../../modules/tickets/services/TicketPriorityService';
 import { purgeExpiredTranscripts } from '../../modules/tickets/services/TranscriptRetentionService';
+import { announceTwitchLives } from '../../modules/influencers/services/TwitchLiveService';
 
 /**
  * Agendador de jobs.
@@ -162,6 +163,15 @@ const transcriptRetentionJob: Job = {
   },
 };
 
+const twitchLiveJob: Job = {
+  name: 'TwitchLiveJob',
+  intervalMs: SCHEDULER_INTERVALS.TWITCH_LIVE_CHECK_MS,
+  async run(): Promise<void> {
+    const client = tryGetClient();
+    if (client !== null) await announceTwitchLives(client);
+  },
+};
+
 /** Limpeza de estruturas em memoria. */
 const maintenanceJob: Job = {
   name: 'MaintenanceJob',
@@ -190,6 +200,7 @@ const JOBS: readonly Job[] = [
   priorityEscalationJob,
   cartReminderJob,
   transcriptRetentionJob,
+  twitchLiveJob,
   backupJob,
   maintenanceJob,
 ];
