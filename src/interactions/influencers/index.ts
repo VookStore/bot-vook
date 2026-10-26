@@ -23,12 +23,22 @@ import {
   type ParsedCustomId,
 } from '../../constants/customIds';
 import { getEnv } from '../../config/env';
-import { PermissionError, ValidationError } from '../../core/errors';
-import { assertCanManageOrders } from '../../core/permissions/PermissionService';
+import {
+  ConfigurationError,
+  DiscordResourceError,
+  PermissionError,
+  ValidationError,
+} from '../../core/errors';
+import {
+  assertCanManageOrders,
+  canBotAssignRole,
+} from '../../core/permissions/PermissionService';
 import type { ButtonHandler } from '../../types';
+import { fetchMemberSafe } from '../../utils/discord';
 
 const DISCORD_SNOWFLAKE = /^\d{17,20}$/;
 const DEFAULT_APPROVAL_CHANNEL_ID = '1564371577686986782';
+const CREATOR_ROLE_ID = '1405241505467338843';
 const processingMessages = new Set<string>();
 
 function decisionRow(discordId: string, decision: 'approved' | 'rejected') {
@@ -100,12 +110,45 @@ async function notifyCandidate(
   }
 }
 
+async function assignCreatorRole(reviewer: GuildMember, discordId: string): Promise<void> {
+  const guild = reviewer.guild;
+  const candidate = await fetchMemberSafe(guild, discordId);
+  if (candidate === null) {
+    throw new ValidationError('Candidato aprovado nao esta no servidor.', {
+      userMessage:
+        'Não foi possível aprovar: o candidato não está no servidor da Vook Store.',
+      context: { discordId, guildId: guild.id },
+    });
+  }
+  if (candidate.roles.cache.has(CREATOR_ROLE_ID)) return;
+
+  const botMember = guild.members.me ?? (await guild.members.fetchMe());
+  const assignable = canBotAssignRole(botMember, CREATOR_ROLE_ID);
+  if (!assignable.ok) {
+    throw new ConfigurationError('Bot nao consegue atribuir o cargo de creator.', {
+      userMessage: `Não foi possível aprovar: ${assignable.reason ?? 'o bot não consegue atribuir o cargo de creator.'}`,
+      context: { roleId: CREATOR_ROLE_ID, guildId: guild.id },
+    });
+  }
+
+  try {
+    await candidate.roles.add(CREATOR_ROLE_ID, 'Inscrição de creator aprovada pela equipe');
+  } catch (cause) {
+    throw new DiscordResourceError('Falha ao atribuir cargo de creator ao candidato.', {
+      userMessage:
+        'Não foi possível aprovar porque o Discord recusou a atribuição do cargo de creator.',
+      context: { discordId, roleId: CREATOR_ROLE_ID, guildId: guild.id },
+      cause,
+    });
+  }
+}
+
 async function decide(
   interaction: ButtonInteraction,
   parsed: ParsedCustomId,
   decision: 'approved' | 'rejected',
 ): Promise<void> {
-  await assertCanReview(interaction);
+  const reviewer = await assertCanReview(interaction);
   const discordId = targetId(parsed);
 
   if (processingMessages.has(interaction.message.id)) {
@@ -116,10 +159,15 @@ async function decide(
 
   try {
     await deferIfNeeded(interaction, { ephemeral: true });
+    if (decision === 'approved') {
+      await assignCreatorRole(reviewer, discordId);
+    }
     const dmSent = await notifyCandidate(interaction, discordId, decision);
     const original = interaction.message.embeds[0];
     const label = decision === 'approved' ? 'APROVADA' : 'REPROVADA';
-    const result = `**${label}** por <@${interaction.user.id}>\nDM ${dmSent ? 'enviada com sucesso' : 'não entregue'}.`;
+    const roleResult =
+      decision === 'approved' ? `\nCargo <@&${CREATOR_ROLE_ID}> atribuído.` : '';
+    const result = `**${label}** por <@${interaction.user.id}>${roleResult}\nDM ${dmSent ? 'enviada com sucesso' : 'não entregue'}.`;
     const embed = original === undefined ? new EmbedBuilder() : EmbedBuilder.from(original);
     embed
       .setColor(0xffffff)
@@ -135,11 +183,18 @@ async function decide(
     });
 
     if (dmSent) {
-      await replySuccess(interaction, `Inscrição ${label.toLowerCase()} e candidato notificado por DM.`);
+      await replySuccess(
+        interaction,
+        decision === 'approved'
+          ? `Inscrição aprovada, cargo atribuído e candidato notificado por DM.`
+          : `Inscrição reprovada e candidato notificado por DM.`,
+      );
     } else {
       await replyWarning(
         interaction,
-        `Inscrição ${label.toLowerCase()}, mas o Discord bloqueou a DM. Avise o candidato por outro canal.`,
+        decision === 'approved'
+          ? 'Inscrição aprovada e cargo atribuído, mas o Discord bloqueou a DM. Avise o candidato por outro canal.'
+          : 'Inscrição reprovada, mas o Discord bloqueou a DM. Avise o candidato por outro canal.',
       );
     }
   } finally {
