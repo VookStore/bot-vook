@@ -326,7 +326,7 @@ function renderPage() {
     `<small class="form-help">Informe exatamente como aparece no seu perfil.</small></div>` +
     `<div class="form-field"><label for="creator-name">Nome de creator</label><input id="creator-name" name="creatorName" minlength="2" maxlength="60" placeholder="Como sua audiência conhece você" required></div>` +
     `<div class="form-field"><label for="age">Idade</label><input id="age" name="age" type="number" min="18" max="99" placeholder="18" required></div>` +
-    `<fieldset class="form-field full" style="border:0;margin:0;padding:0"><legend class="group-label">Plataformas em que produz (selecione pelo menos 2)</legend><div class="platform-options">` +
+    `<fieldset class="form-field full" style="border:0;margin:0;padding:0"><legend class="group-label">Plataformas em que produz (selecione uma ou mais)</legend><div class="platform-options">` +
     `<label class="platform-option"><input type="checkbox" name="platforms" value="TikTok"><span>TikTok</span></label>` +
     `<label class="platform-option"><input type="checkbox" name="platforms" value="Instagram"><span>Instagram</span></label>` +
     `<label class="platform-option"><input type="checkbox" name="platforms" value="YouTube"><span>YouTube</span></label>` +

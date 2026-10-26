@@ -226,7 +226,7 @@ async function handleInfluencerApplication(request, env, url) {
   if (discordUsername.length < 2) invalidFields.push('usuário do Discord');
   if (creatorName.length < 2) invalidFields.push('nome de creator');
   if (!Number.isInteger(age) || age < 18 || age > 99) invalidFields.push('idade');
-  if (platforms.length < 2) invalidFields.push('plataformas (selecione pelo menos 2)');
+  if (platforms.length === 0) invalidFields.push('plataformas');
   if (!normalizedProfiles.valid) invalidFields.push('links dos perfis');
   if (rpExperience.length < 2) invalidFields.push('experiência com RP');
   if (motivation.length < 2) invalidFields.push('motivação');
