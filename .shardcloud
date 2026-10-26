@@ -1,0 +1,6 @@
+DISPLAY_NAME=Vook Store Bot
+DESCRIPTION=Bot da Vook Store: loja, atendimento, PIX, cupons, demandas e entregas.
+LANGUAGE=node
+MEMORY=1024
+VERSION=recommended
+CUSTOM_COMMAND=node scripts/iniciar-shardcloud.mjs

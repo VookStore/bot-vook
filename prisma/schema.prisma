@@ -1,0 +1,1130 @@
+// ==========================================================================
+// VOOK STORE BOT - Schema PostgreSQL
+// Todos os dados sao particionados por guildId (multi-guild seguro).
+// Valores monetarios sao SEMPRE inteiros em centavos (nunca float).
+// ==========================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================================================
+// ENUMS
+// ==========================================================================
+
+enum TicketStatus {
+  CREATING
+  OPEN
+  CLAIMED
+  CLOSING
+  CLOSED
+  ORPHANED
+}
+
+/// A ordem de declaracao define a ordenacao no Postgres.
+/// A fila ordena por priority DESC -> VIP primeiro, NORMAL por ultimo.
+enum TicketPriority {
+  NORMAL
+  HIGH
+  URGENT
+  VIP
+}
+
+enum TicketAuditAction {
+  CREATED
+  CLAIMED
+  UNCLAIMED
+  TRANSFERRED
+  RENAMED
+  MEMBER_ADDED
+  MEMBER_REMOVED
+  CLIENT_NOTIFIED
+  CLOSED
+  ORPHANED
+  RECOVERED
+  PRIORITY_CHANGED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentAuditAction {
+  CREATED
+  COUPON_APPLIED
+  COUPON_CHANGED
+  COUPON_REMOVED
+  AMOUNT_CHANGED
+  APPROVED
+  CANCELLED
+  EXPIRED
+}
+
+enum PixKeyType {
+  CPF
+  CNPJ
+  EMAIL
+  PHONE
+  RANDOM
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum CouponAuditAction {
+  CREATED
+  UPDATED
+  ENABLED
+  DISABLED
+  DELETED
+  RESTORED
+  APPLIED_TO_PAYMENT
+  REMOVED_FROM_PAYMENT
+  USED
+}
+
+enum PaymentSource {
+  MANUAL_COMMAND
+  CATALOG_ORDER
+}
+
+/// Estados do pedido do catalogo. A ordem de declaracao define a ordenacao no
+/// Postgres e acompanha o ciclo comercial: aberto -> cobrado -> pago -> entregue.
+enum OrderStatus {
+  PENDING
+  AWAITING_PAYMENT
+  PAID
+  IN_PROGRESS
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum CartStatus {
+  ACTIVE
+  CHECKED_OUT
+  ABANDONED
+}
+
+enum OrderAuditAction {
+  CART_CHECKOUT_STARTED
+  ORDER_CREATED
+  ORDER_COUPON_APPLIED
+  ORDER_COUPON_REMOVED
+  ORDER_PAYMENT_CREATED
+  ORDER_PAYMENT_EXPIRED
+  ORDER_PAYMENT_CANCELLED
+  ORDER_PAID
+  ORDER_IN_PROGRESS
+  ORDER_DELIVERED
+  ORDER_COMPLETED
+  ORDER_CANCELLED
+  /// Demanda passou a ter responsavel (ou trocou de responsavel).
+  ORDER_ASSIGNED
+  /// Demanda devolvida a fila, sem responsavel.
+  ORDER_UNASSIGNED
+}
+
+/// Resultado da conferencia AUTOMATICA do comprovante.
+/// E auxilio ao vendedor, nunca prova: imagem de comprovante e falsificavel.
+enum ReceiptCheckStatus {
+  /// Tudo que deu para conferir bateu com a cobranca.
+  MATCH
+  /// Alguma divergencia forte (valor ausente, data anterior a cobranca).
+  MISMATCH
+  /// OCR nao extraiu dado suficiente para conferir.
+  UNREADABLE
+  /// Arquivo nao analisavel automaticamente (PDF, por exemplo).
+  SKIPPED
+}
+
+enum CatalogAuditAction {
+  PACK_CREATED
+  PACK_UPDATED
+  PACK_ENABLED
+  PACK_DISABLED
+  PACK_FEATURED
+  PACK_UNFEATURED
+  PACK_DELETED
+  PACK_IMAGE_ADDED
+  PACK_IMAGE_REMOVED
+  PACK_IMAGE_REORDERED
+  PACK_COVER_CHANGED
+  PACK_DETAILS_UPDATED
+  CATEGORY_CREATED
+  CATEGORY_UPDATED
+  CATEGORY_ENABLED
+  CATEGORY_DISABLED
+  CATEGORY_REORDERED
+  CATEGORY_DELETED
+}
+
+enum SystemLogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+// ==========================================================================
+// CONFIGURACAO DA GUILD
+// ==========================================================================
+
+model GuildConfig {
+  id      String @id @default(cuid())
+  guildId String @unique
+
+  storeName String @default("Vook Store")
+
+  // --- Canais ---
+  ticketPanelChannelId String?
+  ticketPanelMessageId String?
+
+  /// Onde a tabela de precos foi publicada. O id da mensagem e o que permite
+  /// reescreve-la no lugar quando um preco muda, em vez de publicar outra.
+  pricingChannelId String?
+  pricingMessageId String?
+
+  /// Onde o anuncio de booster foi publicado. Mesmo par da tabela de precos:
+  /// e o id da mensagem que permite reescreve-la no lugar.
+  boosterChannelId String?
+  boosterMessageId String?
+
+  /// Desconto automatico de booster: cada degrau e um par (cargo, cupom).
+  /// O desconto nao e reimplementado — o cupom ja tem tipo, valor, teto e
+  /// limites, e o modulo central o valida na emissao. Automatiza-se a ESCOLHA.
+  /// Nulos = desligado.
+  boosterRoleId        String?
+  boosterCouponId      String?
+  boosterTier2RoleId   String?
+  boosterTier2CouponId String?
+
+  /// Painel da equipe que cria os anuncios de lobos (par canal+mensagem,
+  /// reescrito no lugar como a tabela de precos).
+  wolfPanelChannelId String?
+  wolfPanelMessageId String?
+  /// Canal publico onde cada lobo entregue vira um post de portfolio.
+  /// Nulo = o painel fica com o botao desligado, em vez de aceitar um
+  /// formulario que nao teria para onde ir.
+  wolfPortfolioChannelId String?
+
+  ticketLogChannelId   String?
+  welcomeChannelId     String?
+  reviewChannelId      String?
+
+  // --- Catalogo ---
+  /// Painel publico do catalogo (par canal+mensagem, editado no lugar).
+  catalogChannelId String?
+  catalogMessageId String?
+
+  /// Canal onde a equipe recebe os novos pedidos. Opcional.
+  orderChannelId String?
+
+  /// Quadro de demandas: onde o cartao da demanda PAGA nasce, com o link para
+  /// o ticket do cliente e os botoes de status.
+  ///
+  /// Separado de `orderChannelId` de proposito. Aquele avisa que uma venda
+  /// comecou — o pedido pode nem estar pago. Demanda so existe depois do
+  /// pagamento, que e quando ha trabalho a fazer.
+  demandChannelId String?
+
+  /// Para onde sai a copia quando a demanda e INICIADA.
+  ///
+  /// O cartao original continua no quadro, reescrito. Os dois canais contam
+  /// historias diferentes: um mostra tudo que entrou, o outro so o que esta em
+  /// producao agora.
+  demandStartedChannelId String?
+
+  /// Para onde a demanda vai quando e ENTREGUE.
+  ///
+  /// Aqui o cartao MUDA de canal em vez de ganhar copia: ele sai de "iniciadas"
+  /// (que so mostra o que esta em producao agora) e passa a viver aqui.
+  demandDoneChannelId String?
+
+  /// Onde cada ticket entregue ganha um cartao apontando para ele.
+  ///
+  /// O Discord nao move topico entre canais: o topico e arquivado (sai da lista
+  /// de ativos, sem fechar) e este canal guarda o atalho — ate o cliente
+  /// confirmar o recebimento, e depois disso como historico.
+  ticketDoneChannelId String?
+
+  /// Canal onde o CLIENTE acha o ticket entregue (painel de localizar).
+  ///
+  /// E o oposto do canal acima: aquele e so da equipe e mostra cliente, pedido e
+  /// atendente de cada venda; este e aberto a cada cliente enquanto ele tiver
+  /// entrega esperando confirmacao, e so contem o painel. Os dois NUNCA podem
+  /// ser o mesmo canal — o bot recusa, porque cada cliente veria as vendas dos
+  /// outros.
+  deliveredLocatorChannelId String?
+  /// Mensagem do painel, para reescreve-la no lugar em vez de empilhar copias.
+  deliveredLocatorMessageId String?
+
+  catalogTitle       String  @default("🛍️ VOOK STORE — CATÁLOGO")
+  catalogDescription String  @default("Explore os packs disponíveis na **Vook Store**. Escolha uma categoria, navegue pelas imagens e adicione ao carrinho.")
+  catalogBannerUrl   String?
+
+  // --- Boas-vindas ---
+  welcomeEnabled   Boolean @default(false)
+  welcomeBannerUrl String?
+
+  // --- Auto-role ---
+  autoRoleEnabled Boolean @default(false)
+  autoRoleId      String?
+
+  // --- Visual do painel publico ---
+  panelTitle       String @default("📁 ATENDIMENTO VOOK")
+  panelDescription String @default("Seja bem-vindo ao sistema de atendimento **Vook**, use o menu abaixo para abrir um ticket e aguarde para ser atendido.")
+
+  panelThumbnailUrl String?
+  panelBannerUrl    String?
+
+  /// Banner exibido no painel interno do ticket.
+  /// Quando nulo, o painel do ticket reaproveita `panelBannerUrl`.
+  ticketBannerUrl String?
+
+  /// Renderizado como citacao no painel: uma linha por aviso.
+  panelNotice String? @default("**Não abra um ticket sem necessidade.**\n**Não marque excessivamente a equipe.**\n**Agilize o atendimento fornecendo o máximo de informações possíveis.**")
+
+  // --- Limites e cooldowns ---
+  maxOpenTicketsPerUser       Int @default(2)
+  maxOpenTicketsGuild         Int @default(100)
+  ticketCreateCooldownSeconds Int @default(60)
+  clientNotifyCooldownSeconds Int @default(300)
+  renameCooldownSeconds       Int @default(120)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("guild_configs")
+}
+
+/// Contadores transacionais por guild (ex.: numeracao sequencial de tickets).
+/// A reserva de numero usa update atomico com increment, nunca count()+1.
+model GuildCounter {
+  guildId String
+  name    String
+  value   Int    @default(0)
+
+  updatedAt DateTime @updatedAt
+
+  @@id([guildId, name])
+  @@map("guild_counters")
+}
+
+// ==========================================================================
+// TICKETS
+// ==========================================================================
+
+model TicketCategory {
+  id      String @id @default(cuid())
+  guildId String
+
+  name        String
+  identifier  String
+  description String?
+  emoji       String?
+  position    Int     @default(0)
+  enabled     Boolean @default(true)
+
+  /// Canal de texto onde os tickets desta categoria viram TOPICOS PRIVADOS.
+  /// Era uma categoria do Discord (um canal por ticket); topico nao consome
+  /// slot de canal, entao o servidor deixou de ter teto de tickets abertos.
+  destinationChannelId String?
+
+  /// Mensagem do painel "Localizar meu ticket" publicada no canal de destino.
+  /// Guardada para reeditar a mesma mensagem em vez de empilhar copias.
+  locatorMessageId String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  teamRoles TicketTeamRole[]
+  tickets   Ticket[]
+
+  @@unique([guildId, identifier])
+  @@index([guildId, enabled, position])
+  @@map("ticket_categories")
+}
+
+model TicketTeamRole {
+  id         String @id @default(cuid())
+  guildId    String
+  categoryId String
+  roleId     String
+
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  category TicketCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, roleId])
+  @@index([guildId])
+  @@map("ticket_team_roles")
+}
+
+model Ticket {
+  id           String @id @default(cuid())
+  guildId      String
+  ticketNumber Int
+
+  categoryId String
+  ownerId    String
+  subject    String
+
+  /// Nulo enquanto o ticket esta em CREATING (canal ainda nao existe).
+  channelId   String?
+  channelName String?
+
+  status   TicketStatus   @default(CREATING)
+  priority TicketPriority @default(NORMAL)
+
+  claimedById String?
+  claimedAt   DateTime?
+
+  closedById  String?
+  closedAt    DateTime?
+  closeReason String?
+
+  panelMessageId String?
+
+  /// URL publica do transcript hospedado. Nulo quando a hospedagem esta
+  /// desligada ou o upload falhou — nesses casos o anexo no log e a unica copia.
+  transcriptUrl String?
+
+  /// Ids dos anexos re-hospedados junto do transcript.
+  ///
+  /// Sao a UNICA forma de apaga-los depois: as chaves no R2 sao aleatorias (o
+  /// endereco secreto e a barreira de leitura) e nao carregam o numero do
+  /// ticket. Vazio nos tickets fechados antes desta coluna existir.
+  transcriptAssetIds String[] @default([])
+
+  /// Cartao do ticket no canal de concluidos (par canal+mensagem).
+  ///
+  /// Nasce na entrega do produto, quando o topico e arquivado — e o atalho para
+  /// um atendimento que saiu da lista de ativos sem ter fechado. E reescrito
+  /// quando o ticket fecha, pelo cliente ou pela equipe.
+  doneCardChannelId String?
+  doneCardMessageId String?
+
+  /// Quando e por quem o produto foi entregue (`/entregar`).
+  ///
+  /// Mora no ticket, e nao so no pedido, porque ha entrega sem pedido — venda
+  /// combinada sem cobranca pelo bot. E o que permite reconstruir o cartao de
+  /// concluidos a qualquer momento, inclusive quando o ticket fecha.
+  deliveredAt   DateTime?
+  deliveredById String?
+
+  lastClientNotifyAt DateTime?
+  lastRenamedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category     TicketCategory      @relation(fields: [categoryId], references: [id])
+  participants TicketParticipant[]
+  transfers    TicketTransfer[]
+  auditLogs    TicketAuditLog[]
+  review       TicketReview?
+
+  @@unique([guildId, ticketNumber])
+  @@unique([channelId])
+  /// Indice principal da fila: tickets OPEN sem responsavel, por categoria.
+  @@index([guildId, categoryId, status, claimedById, priority, ticketNumber])
+  /// Varredura do job de retencao de transcripts.
+  @@index([transcriptUrl, closedAt])
+  @@index([guildId, status])
+  @@index([guildId, ownerId, status])
+  @@index([guildId, claimedById, status])
+  @@index([guildId, createdAt])
+  @@map("tickets")
+}
+
+model TicketParticipant {
+  id       String @id @default(cuid())
+  guildId  String
+  ticketId String
+  userId   String
+
+  addedById String
+  addedAt   DateTime @default(now())
+
+  removedById String?
+  removedAt   DateTime?
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, userId])
+  @@index([guildId, userId])
+  @@map("ticket_participants")
+}
+
+model TicketTransfer {
+  id       String @id @default(cuid())
+  guildId  String
+  ticketId String
+
+  fromStaffId     String?
+  toStaffId       String
+  transferredById String
+  reason          String?
+
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, ticketId])
+  @@map("ticket_transfers")
+}
+
+model TicketAuditLog {
+  id       String @id @default(cuid())
+  guildId  String
+  ticketId String
+
+  action   TicketAuditAction
+  actorId  String?
+  targetId String?
+  oldValue String?
+  newValue String?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, ticketId, createdAt])
+  @@index([guildId, action, createdAt])
+  @@map("ticket_audit_logs")
+}
+
+// ==========================================================================
+// AVALIACOES
+// ==========================================================================
+
+model TicketReview {
+  id      String @id @default(cuid())
+  guildId String
+
+  /// Uma unica avaliacao por ticket (garantido por constraint UNIQUE).
+  ticketId String @unique
+
+  customerId String
+  staffId    String?
+
+  rating  Int
+  comment String?
+
+  reviewChannelId String?
+  reviewMessageId String?
+
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, createdAt])
+  @@index([guildId, staffId])
+  @@index([guildId, rating])
+  @@map("ticket_reviews")
+}
+
+// ==========================================================================
+// PAGAMENTOS PIX
+// ==========================================================================
+
+model PaymentAccount {
+  id      String @id @default(cuid())
+  guildId String
+
+  name        String
+  identifier  String
+  description String?
+
+  receiverName String
+  pixKey       String
+  pixKeyType   PixKeyType
+  city         String
+
+  enabled                  Boolean @default(true)
+  defaultExpirationMinutes Int     @default(30)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  payments Payment[]
+
+  @@unique([guildId, identifier])
+  @@index([guildId, enabled])
+  @@map("payment_accounts")
+}
+
+model Payment {
+  id      String @id @default(cuid())
+  guildId String
+
+  customerId  String
+  createdById String
+  accountId   String
+
+  description String
+
+  /// Valores SEMPRE em centavos (inteiros).
+  originalAmount Int
+  discountAmount Int @default(0)
+  finalAmount    Int
+
+  couponId            String?
+  couponCodeSnapshot  String?
+  couponTypeSnapshot  CouponType?
+  couponValueSnapshot Int?
+
+  pixPayload String
+
+  /// Origem da cobranca (`sourceType`) e pedido cobrado (`sourceId`).
+  /// Toda cobranca pertence a um pedido: as do catalogo nascem de um, e as de
+  /// `/pagamento criar` abrem o seu na hora. `sourceType` continua distinguindo
+  /// os dois caminhos para rastreabilidade.
+  /// `sourceId` so e nulo em cobrancas emitidas antes dessa regra.
+  sourceType PaymentSource @default(MANUAL_COMMAND)
+  sourceId   String?
+
+  status    PaymentStatus @default(PENDING)
+  expiresAt DateTime
+
+  channelId String?
+  messageId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  approvedAt   DateTime?
+  approvedById String?
+
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelReason  String?
+
+  account   PaymentAccount    @relation(fields: [accountId], references: [id])
+  coupon    Coupon?           @relation(fields: [couponId], references: [id])
+  usage     CouponUsage?
+  auditLogs PaymentAuditLog[]
+
+  /// Pedido que aponta para esta cobranca como a cobranca ATUAL.
+  /// Cobrancas substituidas (expiradas/canceladas) continuam rastreaveis por
+  /// `sourceId`, mesmo depois de o pedido apontar para uma cobranca nova.
+  order Order?
+
+  @@index([guildId, status, expiresAt])
+  @@index([guildId, customerId, status])
+  @@index([guildId, createdAt])
+  @@index([couponId])
+  @@index([sourceType, sourceId])
+  @@map("payments")
+}
+
+model PaymentAuditLog {
+  id        String @id @default(cuid())
+  guildId   String
+  paymentId String
+
+  action   PaymentAuditAction
+  actorId  String?
+  oldValue String?
+  newValue String?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, paymentId, createdAt])
+  @@index([guildId, action, createdAt])
+  @@map("payment_audit_logs")
+}
+
+// ==========================================================================
+// CUPONS (ferramenta interna da equipe - o cliente nunca aplica cupom)
+// ==========================================================================
+
+model Coupon {
+  id      String @id @default(cuid())
+  guildId String
+
+  code        String
+  description String?
+
+  type CouponType
+
+  /// PERCENTAGE: base 100 (ex.: 2000 = 20,00%). FIXED_AMOUNT: centavos.
+  value Int
+
+  /// Valor minimo da compra em centavos para o cupom ser elegivel.
+  minimumAmount Int?
+
+  /// Teto de desconto em centavos (aplicavel a cupons percentuais).
+  maximumDiscount Int?
+
+  maxUses            Int?
+  maxUsesPerCustomer Int?
+
+  startsAt  DateTime?
+  expiresAt DateTime?
+
+  enabled Boolean @default(true)
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  payments  Payment[]
+  usages    CouponUsage[]
+  auditLogs CouponAuditLog[]
+  orders    Order[]
+
+  @@unique([guildId, code])
+  @@index([guildId, enabled, deletedAt])
+  @@map("coupons")
+}
+
+/// Uso CONFIRMADO do cupom. Criado somente quando o pagamento e APROVADO.
+/// paymentId e UNIQUE: impede contabilizacao duplicada.
+model CouponUsage {
+  id        String @id @default(cuid())
+  guildId   String
+  couponId  String
+  paymentId String @unique
+
+  customerId     String
+  discountAmount Int
+
+  usedAt DateTime @default(now())
+
+  coupon  Coupon  @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([couponId, customerId])
+  @@index([guildId, usedAt])
+  @@map("coupon_usages")
+}
+
+model CouponAuditLog {
+  id       String @id @default(cuid())
+  guildId  String
+  couponId String
+
+  action    CouponAuditAction
+  actorId   String?
+  paymentId String?
+  oldValue  String?
+  newValue  String?
+  metadata  Json?
+
+  createdAt DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, couponId, createdAt])
+  @@index([guildId, action, createdAt])
+  @@map("coupon_audit_logs")
+}
+
+// ==========================================================================
+// CATALOGO (produtos, imagens e categorias da loja)
+// ==========================================================================
+
+model CatalogCategory {
+  id      String @id @default(cuid())
+  guildId String
+
+  name        String
+  identifier  String
+  description String?
+  emoji       String?
+
+  position Int     @default(0)
+  enabled  Boolean @default(true)
+
+  /// Prazo de producao em dias uteis desta categoria. NULO = sem prazo
+  /// definido; o pedido simplesmente nao ganha previsao, em vez de assumir um
+  /// numero inventado.
+  leadTimeDays Int?
+
+  /// O desconto automatico de booster vale nesta categoria?
+  /// O anuncio publico exclui PEDs, roupas e props; sem isto a automacao daria
+  /// desconto justamente no que a loja disse que nao daria.
+  boosterEligible Boolean @default(true)
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  packs CatalogPack[]
+
+  @@unique([guildId, identifier])
+  @@index([guildId, enabled, position])
+  @@map("catalog_categories")
+}
+
+model CatalogPack {
+  id         String @id @default(cuid())
+  guildId    String
+  categoryId String
+
+  name String
+  slug String
+
+  /// Codigo curto e amigavel (VEH-001). Opcional: NULLs sao distintos no
+  /// Postgres, entao varios packs podem ficar sem SKU sob o mesmo UNIQUE.
+  sku String?
+
+  shortDescription String?
+  description      String?
+
+  /// Preco SEMPRE em centavos (inteiro). Nunca float.
+  price Int
+
+  position Int     @default(0)
+  enabled  Boolean @default(true)
+  featured Boolean @default(false)
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  category   CatalogCategory     @relation(fields: [categoryId], references: [id])
+  images     PackImage[]
+  details    CatalogPackDetail[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@unique([guildId, slug])
+  @@unique([guildId, sku])
+  @@index([guildId, enabled, featured, position])
+  @@index([guildId, categoryId, enabled, position])
+  @@map("catalog_packs")
+}
+
+/// Ficha tecnica do pack (compatibilidade, quantidade, formato...).
+/// Relacional de proposito: JSON aqui viraria dado sem consulta nem validacao.
+model CatalogPackDetail {
+  id     String @id @default(cuid())
+  packId String
+
+  label String
+  value String
+
+  position Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pack CatalogPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@index([packId, position])
+  @@map("catalog_pack_details")
+}
+
+model PackImage {
+  id     String @id @default(cuid())
+  packId String
+
+  url     String
+  altText String?
+
+  position Int     @default(0)
+  isCover  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pack CatalogPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@index([packId, position])
+  @@map("pack_images")
+}
+
+// ==========================================================================
+// CARRINHO
+// ==========================================================================
+
+model Cart {
+  id         String @id @default(cuid())
+  guildId    String
+  customerId String
+
+  status CartStatus @default(ACTIVE)
+
+  /// Igual a `customerId` enquanto o carrinho esta ATIVO e NULL depois do
+  /// checkout. Com (guildId, activeCustomerId) UNIQUE — e NULLs distintos no
+  /// Postgres — o BANCO garante "no maximo um carrinho ativo por cliente",
+  /// sem depender de indice parcial (nao suportado pelo Prisma).
+  activeCustomerId String?
+
+  /// Quando o lembrete de carrinho abandonado foi enviado. NULL = ainda nao foi.
+  /// E a trava de "uma vez so": sem ela, todo carrinho parado receberia uma DM
+  /// a cada rodada do agendador, e o cliente bloquearia as DMs do bot — levando
+  /// junto os avisos de pedido e de pagamento.
+  abandonedNoticeAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items CartItem[]
+
+  @@unique([guildId, activeCustomerId])
+  @@index([guildId, customerId, status])
+  /// Varredura do job de carrinho abandonado.
+  @@index([status, abandonedNoticeAt, updatedAt])
+  @@map("carts")
+}
+
+model CartItem {
+  id     String @id @default(cuid())
+  cartId String
+  packId String
+
+  /// Pack digital: uma unidade por pedido. O UNIQUE abaixo impede duplicata.
+  quantity Int @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart Cart        @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  pack CatalogPack @relation(fields: [packId], references: [id])
+
+  @@unique([cartId, packId])
+  @@index([packId])
+  @@map("cart_items")
+}
+
+// ==========================================================================
+// PEDIDOS
+// ==========================================================================
+
+model Order {
+  id          String @id @default(cuid())
+  guildId     String
+  orderNumber Int
+  customerId  String
+
+  status OrderStatus @default(PENDING)
+
+  /// Valores SEMPRE em centavos.
+  subtotalAmount Int
+  discountAmount Int @default(0)
+  finalAmount    Int
+
+  couponId            String?
+  couponCodeSnapshot  String?
+  couponTypeSnapshot  CouponType?
+  couponValueSnapshot Int?
+
+  /// Previsao de entrega, congelada no momento do PAGAMENTO.
+  ///
+  /// Data absoluta e nao um prazo relativo: mudar o prazo da categoria depois
+  /// nao pode reescrever a promessa feita a quem ja comprou.
+  dueAt DateTime?
+
+  /// Quem da equipe esta produzindo. NULO = demanda livre na fila.
+  ///
+  /// Mantido depois da entrega: continua dizendo quem produziu.
+  assignedToId String?
+  assignedAt   DateTime?
+
+  /// Cobranca ATUAL do pedido (o modulo central de pagamentos e quem cobra).
+  paymentId String? @unique
+
+  /// Canal de origem da compra e mensagem do painel no canal de pedidos.
+  channelId      String?
+  panelChannelId String?
+  panelMessageId String?
+
+  /// Cartao desta demanda no quadro (par canal+mensagem, reescrito no lugar).
+  ///
+  /// O canal vai junto do id da mensagem, como no painel acima: trocar o canal
+  /// configurado nao pode fazer o bot procurar a mensagem antiga no lugar novo.
+  demandChannelId String?
+  demandMessageId String?
+
+  /// Copia publicada no canal de iniciadas quando a producao comecou.
+  ///
+  /// Volta a nulo quando a demanda e entregue: o cartao e APAGADO de la, porque
+  /// "iniciadas" so mostra o que esta em producao agora.
+  demandStartedChannelId String?
+  demandStartedMessageId String?
+
+  /// Cartao no canal de demandas concluidas, publicado na entrega.
+  demandDoneChannelId String?
+  demandDoneMessageId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  paidAt DateTime?
+
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelReason  String?
+
+  deliveredAt   DateTime?
+  deliveredById String?
+
+  completedAt   DateTime?
+  completedById String?
+
+  items     OrderItem[]
+  auditLogs OrderAuditLog[]
+  receipts  OrderReceipt[]
+  payment   Payment?        @relation(fields: [paymentId], references: [id])
+  coupon    Coupon?         @relation(fields: [couponId], references: [id])
+
+  @@unique([guildId, orderNumber])
+  @@index([guildId, status, createdAt])
+  /// Fila de producao: pedidos em aberto ordenados por vencimento.
+  @@index([guildId, status, dueAt])
+  /// "Minhas demandas" e carga por pessoa.
+  @@index([guildId, assignedToId, status])
+  @@index([guildId, customerId, createdAt])
+  @@index([guildId, createdAt])
+  @@index([couponId])
+  @@map("orders")
+}
+
+/// Item do pedido com SNAPSHOT do produto no momento da compra.
+/// Alterar o preco do pack depois NAO muda pedidos historicos.
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  packId  String
+
+  skuSnapshot   String?
+  nameSnapshot  String
+  priceSnapshot Int
+  quantity      Int     @default(1)
+
+  createdAt DateTime @default(now())
+
+  order Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  pack  CatalogPack @relation(fields: [packId], references: [id])
+
+  @@unique([orderId, packId])
+  @@index([packId])
+  @@map("order_items")
+}
+
+/// Comprovante de pagamento enviado pelo CLIENTE.
+///
+/// IMPORTANTE: este registro NAO aprova nada. Imagem de comprovante PIX e
+/// trivialmente falsificavel, entao a conferencia automatica serve para o
+/// vendedor bater o olho mais rapido — quem aprova a cobranca continua sendo
+/// uma pessoa, pelo fluxo normal do modulo de pagamentos.
+model OrderReceipt {
+  id      String @id @default(cuid())
+  guildId String
+  orderId String
+
+  /// Cobranca a que o comprovante se refere no momento do envio.
+  paymentId String?
+
+  uploadedById String
+  fileName     String
+  contentType  String
+
+  /// URL PERSISTENTE: a mensagem republicada pelo bot. O anexo original do
+  /// cliente nao serve, porque o CDN do Discord assina os links com validade.
+  fileUrl String
+
+  checkStatus    ReceiptCheckStatus
+  /// Valor lido do comprovante, em centavos.
+  detectedAmount Int?
+  /// Data lida do comprovante.
+  detectedDate   DateTime?
+  /// Resumo legivel das conferencias, exibido ao vendedor.
+  checkNotes     String?
+
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, orderId, createdAt])
+  @@index([guildId, createdAt])
+  @@map("order_receipts")
+}
+
+model OrderAuditLog {
+  id      String @id @default(cuid())
+  guildId String
+  orderId String
+
+  action        OrderAuditAction
+  performedById String?
+  oldValue      String?
+  newValue      String?
+  metadata      Json?
+
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, orderId, createdAt])
+  @@index([guildId, action, createdAt])
+  @@map("order_audit_logs")
+}
+
+/// Auditoria da administracao do catalogo (packs, imagens e categorias).
+model CatalogAuditLog {
+  id      String @id @default(cuid())
+  guildId String
+
+  action     CatalogAuditAction
+  packId     String?
+  categoryId String?
+  imageId    String?
+
+  actorId  String?
+  oldValue String?
+  newValue String?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([guildId, action, createdAt])
+  @@index([guildId, packId, createdAt])
+  @@map("catalog_audit_logs")
+}
+
+// ==========================================================================
+// OBSERVABILIDADE
+// ==========================================================================
+
+model SystemErrorLog {
+  id      String  @id @default(cuid())
+  guildId String?
+
+  level    SystemLogLevel
+  module   String
+  message  String
+  stack    String?
+  metadata Json?
+
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  @@index([level, createdAt])
+  @@index([guildId, createdAt])
+  @@map("system_error_logs")
+}

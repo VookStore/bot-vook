@@ -1,0 +1,21 @@
+node_modules/
+.env
+*.log
+logs/
+tmp/
+.tmp/
+/transcripts/
+.wrangler/
+# Dumps do banco: contem dado de cliente e historico de pagamento.
+backups/
+qrcodes/
+.DS_Store
+
+# Pacote gerado por npm run pack:shardcloud
+pacotes/
+
+# Conexao do banco da ShardCloud (usada so na migracao dos dados)
+.env.shardcloud
+
+# Variaveis para importar no painel da ShardCloud (tem segredos)
+shardcloud.env

@@ -1,0 +1,59 @@
+{
+  "name": "vook-store-bot",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Vook Store Bot V2 — Sistema comercial, atendimento, PIX, cupons, fila e avaliacoes para Discord",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "deploy:commands": "tsx scripts/deploy-commands.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:format": "prisma format",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "backup": "tsx scripts/backup-db.ts",
+    "pack:shardcloud": "node scripts/empacotar-shardcloud.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "discord.js": "14.27.0",
+    "dotenv": "17.2.3",
+    "pngjs": "5.0.0",
+    "prisma": "6.19.3",
+    "qrcode": "1.5.4",
+    "tesseract.js": "7.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.1",
+    "@types/node": "24.10.1",
+    "@types/pngjs": "6.0.5",
+    "@types/qrcode": "1.5.5",
+    "eslint": "9.39.1",
+    "jsqr": "1.4.0",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.4",
+    "vitest": "3.2.4"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "prisma@6.19.3": true
+  }
+}

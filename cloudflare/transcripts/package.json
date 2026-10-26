@@ -1,0 +1,5 @@
+{
+  "name": "vook-transcripts-worker",
+  "private": true,
+  "type": "module"
+}

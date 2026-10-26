@@ -1,0 +1,36 @@
+# Worker que guarda e serve os transcripts de atendimento.
+#
+# POR QUE UM WORKER, E NAO A API S3 DO R2 DIRETO. Falar S3 com o R2 exigiria
+# assinatura SigV4 — na pratica, o SDK da AWS. Este projeto tem seis
+# dependencias no total, e trocar isso por ~40 linhas de Worker mantem o bot
+# fazendo um `fetch` simples. De quebra, o Worker e o lugar natural para
+# acrescentar expiracao de link ou login depois, sem tocar no bot.
+#
+# Deploy:
+#   npm i -g wrangler
+#   wrangler login
+#   wrangler secret put UPLOAD_TOKEN     # cole o mesmo valor do .env do bot
+#   wrangler deploy
+
+name = "vook-transcripts"
+main = "src/worker.js"
+compatibility_date = "2026-08-30"
+
+# Assets visuais da landing page. Arquivos existentes sao servidos antes do
+# Worker; as demais rotas continuam seguindo para `src/worker.js`.
+[assets]
+directory = "./public/"
+
+# Liga o bucket ao Worker. `bucket_name` precisa bater com o nome criado no
+# painel (R2 > Create bucket). `binding` e como o codigo enxerga o bucket.
+[[r2_buckets]]
+binding = "TRANSCRIPTS"
+bucket_name = "vook-transcripts"
+
+# UPLOAD_TOKEN NAO entra aqui: segredo em arquivo versionado vira segredo
+# vazado. Ele e gravado por `wrangler secret put`.
+
+# Inscricoes de creators (tambem configurados como segredos/variaveis no Worker):
+#   wrangler secret put DISCORD_BOT_TOKEN
+#   wrangler secret put INFLUENCER_APPROVAL_CHANNEL_ID
+# O segundo valor e o ID do canal interno onde os embeds serao publicados.
