@@ -3,4 +3,5 @@ DESCRIPTION=Bot da Vook Store: loja, atendimento, PIX, cupons, demandas e entreg
 LANGUAGE=node
 MEMORY=1024
 VERSION=recommended
+SUBDOMAIN=vook-auth
 CUSTOM_COMMAND=node scripts/iniciar-shardcloud.mjs

@@ -12,6 +12,9 @@ O repositório é https://github.com/VookStore/bot-vook .
 O deploy atual usa dist/index.js já compilado. Suba também os arquivos dist
 atualizados, src, prisma/migrations, schema e scripts alterados.
 O comando de início continua: node scripts/iniciar-shardcloud.mjs
+O arquivo .shardcloud deve manter SUBDOMAIN=vook-auth nos próximos deploys.
+O subdomínio já foi habilitado no painel; omitir esse campo pode fazer o
+deploy ser recusado com "subdomain cannot be removed".
 Ele gera o Prisma e aplica as migrações pendentes antes de iniciar o bot.
 A nova migração somente cria ScriptLicense e ScriptLicenseEvent; não apaga
 clientes, compras ou tabelas existentes. Mantenha o backup habitual do banco.
