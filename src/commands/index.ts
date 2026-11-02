@@ -21,12 +21,15 @@ import { ticketPainelCommand } from './system/ticketPainel';
 import { ticketSistemaCommand } from './system/ticketSistema';
 import { entregarCommand } from './tickets/entregar';
 import type { SlashCommandDefinition } from '../types';
+import { licenseCommand, plansCommand } from '../modules/licenses/commands';
 
 /**
  * Todos os slash commands do Vook Store Bot.
  * Esta lista alimenta o registro em memoria e o deploy na API do Discord.
  */
 export const commands: readonly SlashCommandDefinition[] = [
+  licenseCommand,
+  plansCommand,
   // Configuracao
   ticketConfigCommand,
   ticketCategoriasCommand,

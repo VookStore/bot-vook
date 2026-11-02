@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.INFLUENCER_ACTION = exports.DELIVERY_ACTION = exports.WOLF_ACTION = exports.ANNOUNCE_ACTION = exports.ORDER_ACTION = exports.CART_ACTION = exports.CATALOG_ACTION = exports.ACCOUNT_ACTION = exports.TEAM_ACTION = exports.DESTINATION_ACTION = exports.CATEGORY_ACTION = exports.COUPON_ACTION = exports.BOOSTER_ACTION = exports.CONFIG_ACTION = exports.REVIEW_ACTION = exports.PAYMENT_ACTION = exports.TICKET_ACTION = exports.NAMESPACE = exports.MAX_CUSTOM_ID_LENGTH = exports.CUSTOM_ID_SEPARATOR = void 0;
+exports.INFLUENCER_ACTION = exports.DELIVERY_ACTION = exports.WOLF_ACTION = exports.ANNOUNCE_ACTION = exports.ORDER_ACTION = exports.CART_ACTION = exports.CATALOG_ACTION = exports.ACCOUNT_ACTION = exports.TEAM_ACTION = exports.DESTINATION_ACTION = exports.CATEGORY_ACTION = exports.COUPON_ACTION = exports.BOOSTER_ACTION = exports.CONFIG_ACTION = exports.REVIEW_ACTION = exports.PAYMENT_ACTION = exports.TICKET_ACTION = exports.LICENSE_ACTION = exports.NAMESPACE = exports.MAX_CUSTOM_ID_LENGTH = exports.CUSTOM_ID_SEPARATOR = void 0;
 exports.buildCustomId = buildCustomId;
 exports.parseCustomId = parseCustomId;
 exports.requireArg = requireArg;
@@ -20,6 +20,7 @@ const errors_1 = require("../core/errors");
 exports.CUSTOM_ID_SEPARATOR = ':';
 exports.MAX_CUSTOM_ID_LENGTH = 100;
 exports.NAMESPACE = {
+    LICENSE: 'license',
     TICKET: 'ticket',
     PAYMENT: 'payment',
     REVIEW: 'review',
@@ -38,6 +39,7 @@ exports.NAMESPACE = {
     DELIVERY: 'delivery',
     INFLUENCER: 'influencer',
 };
+exports.LICENSE_ACTION = { LIST: 'list', VIEW: 'view', KEY: 'key' };
 /**
  * Monta um customId validado.
  * Lanca ValidationError quando o resultado excede o limite do Discord — assim o

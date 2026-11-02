@@ -4,6 +4,8 @@ import { getEnv } from '../src/config/env';
 import { registry } from '../src/core/client/registry';
 import { registerAll } from '../src/interactions';
 import { createLogger } from '../src/core/logger/Logger';
+import { licenseConfig } from '../src/modules/licenses/config';
+import { licenseCommand, plansCommand } from '../src/modules/licenses/commands';
 
 /**
  * Registro dos slash commands na API do Discord.
@@ -20,7 +22,7 @@ async function main(): Promise<void> {
   const env = getEnv();
 
   registerAll(registry);
-  const body = registry.toApplicationCommands();
+  const body = registry.toApplicationCommands().filter(command => !['planos', 'licenca'].includes(command.name));
 
   if (body.length === 0) {
     logger.error('Nenhum comando encontrado para registrar.');
@@ -41,6 +43,11 @@ async function main(): Promise<void> {
   });
 
   const result = (await rest.put(route, { body })) as unknown[];
+  const licenses = licenseConfig();
+  if (licenses.enabled) {
+    await rest.post(Routes.applicationCommands(env.DISCORD_CLIENT_ID), { body: plansCommand.builder.toJSON() });
+    await rest.post(Routes.applicationGuildCommands(env.DISCORD_CLIENT_ID, licenses.guildId), { body: licenseCommand.builder.toJSON() });
+  }
 
   logger.info('Comandos registrados com sucesso.', { total: result.length });
 }

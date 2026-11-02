@@ -20,6 +20,7 @@ import { welcomeButtons } from './welcome';
 import { boosterSelects } from './booster';
 import { wolfButtons, wolfModals } from './wolves';
 import { influencerButtons } from './influencers';
+import { licenseButtons } from '../modules/licenses/commands';
 
 /**
  * Registro de todos os comandos e handlers de componente.
@@ -31,6 +32,7 @@ export function registerAll(target: Registry = registry): Registry {
   target.registerCommands(commands);
 
   target.registerButtons([
+    ...licenseButtons,
     ...ticketButtons,
     ...paymentButtons,
     ...couponButtons,

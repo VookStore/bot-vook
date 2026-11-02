@@ -19,6 +19,7 @@ const welcome_1 = require("./welcome");
 const booster_1 = require("./booster");
 const wolves_1 = require("./wolves");
 const influencers_1 = require("./influencers");
+const commands_2 = require("../modules/licenses/commands");
 /**
  * Registro de todos os comandos e handlers de componente.
  *
@@ -28,6 +29,7 @@ const influencers_1 = require("./influencers");
 function registerAll(target = registry_1.registry) {
     target.registerCommands(commands_1.commands);
     target.registerButtons([
+        ...commands_2.licenseButtons,
         ...tickets_1.ticketButtons,
         ...payments_1.paymentButtons,
         ...coupons_1.couponButtons,

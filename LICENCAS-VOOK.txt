@@ -1,0 +1,156 @@
+VOOK — LICENCIAMENTO MANUAL (SEM COMPRA)
+
+ATIVAÇÃO
+O módulo é habilitado com LICENSE_ENABLED=true nas variáveis da hospedagem.
+O deploy não emite licenças de teste: use /licenca criar para conceder acesso
+a uma pessoa. A emissão manual não depende do funcionamento das compras.
+O recurso instalado na cidade continua funcionando sem esta exigência.
+
+1. ATIVAR NO BOT / SHARDCLOUD
+
+O repositório é https://github.com/VookStore/bot-vook .
+O deploy atual usa dist/index.js já compilado. Suba também os arquivos dist
+atualizados, src, prisma/migrations, schema e scripts alterados.
+O comando de início continua: node scripts/iniciar-shardcloud.mjs
+Ele gera o Prisma e aplica as migrações pendentes antes de iniciar o bot.
+A nova migração somente cria ScriptLicense e ScriptLicenseEvent; não apaga
+clientes, compras ou tabelas existentes. Mantenha o backup habitual do banco.
+
+No painel da aplicação, mantenha as variáveis atuais e acrescente:
+
+LICENSE_ENABLED=true
+LICENSE_GUILD_ID=ID_DO_SERVIDOR_DISCORD_OFICIAL_DA_VOOK
+LICENSE_ENCRYPTION_KEY=CHAVE_HEXADECIMAL_DE_64_CARACTERES
+LICENSE_PORT=80
+LICENSE_ADMIN_IDS=SEU_ID_DISCORD
+LICENSE_ADMIN_ROLE_IDS=
+
+O dono do servidor Discord oficial já tem acesso. ADMIN_IDS e ADMIN_ROLE_IDS
+permitem delegar acesso; separe vários IDs por vírgula. Ser administrador de
+outro servidor ou apenas ter permissão Administrador não autoriza emitir.
+
+Para gerar a chave de criptografia, execute no terminal, dentro de BOTS:
+node scripts/gerar-chave-licencas.mjs
+
+Copie o valor apenas para as variáveis da hospedagem e para seu backup privado.
+Não coloque no código/GitHub. Não regenere a cada deploy: a chave existente é
+necessária para recuperar os códigos das licenças já emitidas.
+
+A ShardCloud disponibiliza HTTPS gratuito em *.shardweb.app e encaminha para
+a porta 80. No painel da aplicação, obtenha/habilite esse endereço público.
+Não é necessário comprar domínio. Documentação oficial:
+https://shardcloud.app/pt-br/resources/nodejs-hosting
+
+Depois do deploy com LICENSE_ENABLED=true:
+- /health deve responder {"ok":true} no endereço HTTPS da aplicação.
+- O log deve mostrar "Licenciamento manual iniciado".
+- O bot registra /licenca no servidor oficial e /planos globalmente para
+  também funcionar na conversa privada. Os outros comandos são preservados.
+- Se não aparecer, confira o log, a instalação do bot e o escopo
+  applications.commands. O Discord pode levar algum tempo para atualizar.
+- Não rode outra cópia do bot no PC usando o mesmo token da hospedagem.
+
+2. DAR UMA LICENÇA, SEM VENDA
+
+No servidor oficial da VOOK:
+/licenca criar plano:mensal usuario:@Pessoa
+OU
+/licenca criar plano:vitalicio discord_id:123456789012345678
+
+Escolha usuário OU ID; não os dois. O Discord deve conseguir localizar a conta.
+Planos: semanal (7 dias), mensal (30 dias), anual (365 dias), vitalicio.
+São dias corridos, não meses/anos de calendário.
+
+Por padrão, o prazo começa quando o script autentica pela primeira vez.
+Use iniciar_agora:true se quiser contar a partir da emissão.
+A resposta do administrador mostra o ID da licença; o código secreto é
+entregue somente ao proprietário pelo botão "Ver código de ativação".
+
+/licenca listar discord_id:ID_DO_CLIENTE pagina:1
+/licenca consultar id:ID_DA_LICENCA
+/licenca renovar id:ID_DA_LICENCA plano:mensal
+/licenca suspender id:ID_DA_LICENCA
+/licenca reativar id:ID_DA_LICENCA
+/licenca desvincular id:ID_DA_LICENCA
+
+Renovar preserva o código e soma o prazo ao vencimento futuro; se venceu,
+conta a partir de agora. Licença pendente continua aguardando primeiro uso.
+Renovar uma licença suspensa NÃO a reativa. Reativar não estende validade.
+Desvincular permite que a próxima validação vincule outro servidor; pare a
+instalação anterior antes, para ela não capturar o vínculo novamente.
+
+3. PAINEL E AVISOS NO PRIVADO
+
+O cliente usa /planos no privado do bot (ou no servidor com resposta privada).
+Cada botão confere novamente se a licença pertence à pessoa.
+O painel mostra produto, plano, estado, vencimento, vínculo e código mascarado.
+"Ver código de ativação" revela o código em resposta privada.
+
+Avisos: emissão, primeira ativação, renovação, suspensão, reativação,
+desvinculação/novo vínculo, até 3 dias e até 24h para vencer, vencimento.
+A fila fica no PostgreSQL e é processada a cada minuto, em lotes.
+Lembretes são deduplicados por licença/data de vencimento. Uma renovação
+invalida lembretes antigos. Em falha temporária há até cinco tentativas;
+privado bloqueado é registrado sem insistir indefinidamente.
+Confira a entrega em /licenca consultar. O cliente ainda pode usar /planos.
+Um timeout de rede após envio pode excepcionalmente duplicar um aviso;
+o Discord não oferece confirmação transacional junto ao banco do bot.
+
+4. AUTENTICAÇÃO NAS PELÚCIAS
+
+A cópia preparada está em:
+C:\Users\Enrick Mello\BOTS\pacotes\pelucias-licenciado\vook_plush_tb
+
+O endereço informado em 02/11/2026 já está preenchido em server/license.lua:
+https://vook-auth.shardweb.app/v1/licenses/validate
+O preparador também usa esse endereço por padrão.
+Ela ainda NÃO deve substituir a instalada antes de publicar/habilitar a API
+no bot e emitir uma licença válida. Na verificação de 02/11/2026, /health
+exibiu a página "502 Bad Gateway" da ShardCloud, sem responder o JSON da API.
+
+Para produzir outra cópia com o endereço preenchido:
+node scripts/preparar-pelucias-licenciado.mjs "PASTA_ORIGINAL_DO_RECURSO" "NOVA_PASTA_DE_DESTINO" "https://vook-auth.shardweb.app"
+
+O preparador não altera a origem e recusa um destino existente. É compatível
+com a estrutura atual das pelúcias VOOK/True Blood; recusa arquivos diferentes.
+O nome final da pasta no servidor deve continuar vook_plush_tb ou vook_plush.
+Mantenha os props vk_htyd, ox_inventory e qbx_core da instalação existente.
+O pacote de autenticação não substitui a instalação dos props/imagens.
+
+Antes do ensure, no server.cfg privado do cliente:
+set vook_plush_license "CODIGO_FORNECIDO_PELO_BOT"
+ensure vook_plush_tb
+
+Use set, NUNCA setr/sets. Não coloque o código no config.lua compartilhado.
+Depois de emitir a licença e configurar o código/endereço, reinicie o recurso.
+O log deve mostrar "Licença validada. Sistema liberado."
+
+O script valida no início e aproximadamente a cada 2 minutos. Sem resposta,
+uma autorização já obtida dura no máximo 15 minutos e nunca além do vencimento.
+Uma instalação nova não inicia sem validação. No início há até 60 segundos
+para recuperar falhas transitórias. Uma recusa explícita encerra o recurso.
+Ao vencer o prazo, somente o recurso de pelúcias é parado; não apaga coleções.
+Após renovar/corrigir a conexão, use restart no recurso para autenticar de novo.
+
+O vínculo usa um identificador persistente em KVP. Não é IP público e não
+depende de cabeçalhos de proxy da hospedagem. Não copie esse KVP para outro
+servidor; solicite desvinculação. Não é uma proteção contra alguém que copie
+o código e edite a validação: Lua aberto pode ser alterado. Distribuição com
+Asset Escrow deve ser tratada separadamente para proteger o código crítico.
+
+5. ARQUIVOS E MANUTENÇÃO
+
+src/modules/licenses/             regras, painel, comandos, API e fila
+prisma/migrations/20261102200000_script_licenses/  novas tabelas
+integrations/fivem/license.lua    módulo de autenticação do servidor
+scripts/preparar-pelucias-licenciado.mjs  gera uma cópia protegida
+tests/licenses.test.ts           testes locais sem token ou banco real
+pacotes/vook-store-shardcloud.zip pacote alternativo ao deploy via GitHub
+
+Para atualizar via GitHub, revise git diff e envie os arquivos alterados e
+novos, incluindo dist e a migração. Nunca inclua .env, shardcloud.env, backups,
+logs, node_modules ou chaves. O deploy remoto não é realizado por este guia.
+
+Validação em produção ainda necessária: migração no PostgreSQL hospedado,
+publicação HTTPS, emissão para sua conta de teste, recebimento de DM e teste
+de início/renovação/suspensão/reconexão dentro do FiveM real.

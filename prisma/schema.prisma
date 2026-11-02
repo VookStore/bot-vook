@@ -8,6 +8,49 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Licenças manuais: independentes de pagamentos e isoladas por loja.
+model ScriptLicense {
+  id             String   @id @default(cuid())
+  guildId        String
+  ownerId        String
+  product        String
+  plan           String
+  state          String   @default("ACTIVE")
+  keyHash        String   @unique
+  keyCipher      String
+  keySuffix      String
+  startsOnUse    Boolean  @default(true)
+  activatedAt    DateTime?
+  expiresAt      DateTime?
+  installationHash String?
+  resource       String?
+  lastSeenAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  events         ScriptLicenseEvent[]
+
+  @@index([guildId, ownerId, createdAt])
+  @@index([state, expiresAt])
+}
+
+model ScriptLicenseEvent {
+  id          String   @id @default(cuid())
+  licenseId   String
+  license     ScriptLicense @relation(fields: [licenseId], references: [id], onDelete: Restrict)
+  actorId     String
+  kind        String
+  message     String
+  dedupe      String   @unique
+  createdAt   DateTime @default(now())
+  deliveredAt DateTime?
+  failedAt    DateTime?
+  attempts    Int      @default(0)
+  lockedUntil DateTime?
+  lockToken   String?
+
+  @@index([deliveredAt, failedAt, lockedUntil])
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

@@ -8,12 +8,13 @@ import { toDisplayString } from '../../utils/stringify';
  */
 
 const SECRET_KEY_PATTERN =
-  /(token|secret|password|passwd|senha|authorization|auth|apikey|api_key|database_url|databaseurl|connection_string|private_key|privatekey|cookie|session)/i;
+  /(token|secret|password|passwd|senha|authorization|auth|apikey|api_key|database_url|databaseurl|connection_string|private_key|privatekey|cookie|session|keyCipher|licenseKey|license_key)/i;
 
 const REDACTED = '[REDACTED]';
 
 /** Padroes textuais que precisam ser mascarados em qualquer string. */
 const VALUE_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
+  { pattern: /VOOK-[A-F\d]{64}/gi, replacement: REDACTED },
   // URLs de conexao com credenciais: postgres://user:pass@host/db
   { pattern: /\b([a-z][a-z0-9+.-]*):\/\/([^\s:/@]+):([^\s@]+)@/gi, replacement: '$1://$2:***@' },
   // Bot tokens do Discord (3 segmentos base64url separados por ponto).

@@ -17,6 +17,7 @@ export const CUSTOM_ID_SEPARATOR = ':';
 export const MAX_CUSTOM_ID_LENGTH = 100;
 
 export const NAMESPACE = {
+  LICENSE: 'license',
   TICKET: 'ticket',
   PAYMENT: 'payment',
   REVIEW: 'review',
@@ -37,6 +38,7 @@ export const NAMESPACE = {
 } as const;
 
 export type Namespace = (typeof NAMESPACE)[keyof typeof NAMESPACE];
+export const LICENSE_ACTION = { LIST: 'list', VIEW: 'view', KEY: 'key' } as const;
 
 export interface ParsedCustomId {
   namespace: string;

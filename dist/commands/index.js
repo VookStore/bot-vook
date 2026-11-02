@@ -23,11 +23,14 @@ const precos_1 = require("./system/precos");
 const ticketPainel_1 = require("./system/ticketPainel");
 const ticketSistema_1 = require("./system/ticketSistema");
 const entregar_1 = require("./tickets/entregar");
+const commands_1 = require("../modules/licenses/commands");
 /**
  * Todos os slash commands do Vook Store Bot.
  * Esta lista alimenta o registro em memoria e o deploy na API do Discord.
  */
 exports.commands = [
+    commands_1.licenseCommand,
+    commands_1.plansCommand,
     // Configuracao
     ticketConfig_1.ticketConfigCommand,
     ticketCategorias_1.ticketCategoriasCommand,

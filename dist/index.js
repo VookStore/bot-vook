@@ -26,6 +26,7 @@ const ReceiptOcrService_1 = require("./modules/catalog/services/ReceiptOcrServic
 const OrderNotificationService_1 = require("./modules/catalog/services/OrderNotificationService");
 const DemandBoardService_1 = require("./modules/demands/services/DemandBoardService");
 const clientHolder_2 = require("./core/client/clientHolder");
+const runtime_1 = require("./modules/licenses/runtime");
 /**
  * Ponto de entrada do Vook Store Bot.
  *
@@ -184,6 +185,9 @@ async function bootstrap() {
     await (0, RecoveryService_1.runStartupRecovery)(readyClient).catch((error) => (0, interactionErrorHandler_1.handleBackgroundError)('bootstrap:recovery', error));
     step(7, 'Schedulers');
     (0, SchedulerService_1.startSchedulers)();
+    await (0, runtime_1.startLicenseRuntime)(readyClient).catch(() => {
+        logger.warn('Licenciamento não iniciou. Confira as variáveis LICENSE_* e a porta HTTP. Os demais módulos continuam ativos.');
+    });
     step(8, 'Validation');
     await validateGuilds(readyClient);
     logger.info(`${branding_1.BOT_NAME} operacional.`, {
@@ -229,6 +233,7 @@ async function shutdown(client, signal, exitCode = 0) {
         logger.error('Falha ao encerrar o cliente do Discord.', error);
     }
     try {
+        await (0, runtime_1.stopLicenseRuntime)();
         (0, SchedulerService_1.stopSchedulers)();
     }
     catch (error) {

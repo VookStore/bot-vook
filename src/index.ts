@@ -31,6 +31,7 @@ import {
 } from './modules/catalog/services/OrderNotificationService';
 import { publishDemandById } from './modules/demands/services/DemandBoardService';
 import { tryGetClient } from './core/client/clientHolder';
+import { startLicenseRuntime, stopLicenseRuntime } from './modules/licenses/runtime';
 
 /**
  * Ponto de entrada do Vook Store Bot.
@@ -211,6 +212,9 @@ async function bootstrap(): Promise<void> {
 
   step(7, 'Schedulers');
   startSchedulers();
+  await startLicenseRuntime(readyClient).catch(() => {
+    logger.warn('Licenciamento não iniciou. Confira as variáveis LICENSE_* e a porta HTTP. Os demais módulos continuam ativos.');
+  });
 
   step(8, 'Validation');
   await validateGuilds(readyClient);
@@ -262,6 +266,7 @@ async function shutdown(client: Client, signal: string, exitCode = 0): Promise<v
   }
 
   try {
+    await stopLicenseRuntime();
     stopSchedulers();
   } catch (error) {
     logger.error('Falha ao parar os schedulers.', error);
