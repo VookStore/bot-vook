@@ -11,15 +11,15 @@ const source=readFileSync(join(root,'integrations/fivem/license.lua'),'utf8').re
 const mock=`
 Mock={now=1000000,mode='valid',lease=900,threads={},timers={},kvp={},requests=0,stops=0}
 os.time=function() return Mock.now end
-function GetCurrentResourceName() return 'vook_plush_tb' end
-function GetConvar() return Mock.key or ('VOOK-'..string.rep('A',64)) end
+function GetCurrentResourceName() return Mock.resource or 'vook_plush_tb' end
+function GetConvar(name,default) Mock.convar=name return Mock.convars and (Mock.convars[name] or default) or Mock.key or ('VOOK-'..string.rep('A',64)) end
 function GetResourceKvpString(k) return Mock.kvp[k] end
 function SetResourceKvp(k,v) Mock.kvp[k]=v end
 function CreateThread(fn) table.insert(Mock.threads,{co=coroutine.create(fn),wake=Mock.now}) end
 function Wait(ms) return coroutine.yield(ms/1000) end
 function SetTimeout(ms,fn) table.insert(Mock.timers,{at=Mock.now+ms/1000,fn=fn}) end
 function StopResource() Mock.stops=Mock.stops+1 end
-function TriggerEvent() Mock.ready=true end
+function TriggerEvent(name) Mock.ready=true Mock.event=name end
 json={encode=function(v)return v end,decode=function(v)return v end}
 function PerformHttpRequest(url,cb,method,body,headers,options)
   assert(url=='https://test.example/v1/licenses/validate' and method=='POST')
@@ -56,6 +56,9 @@ const cases=[
   ['lease acima do limite',`Mock.lease=901`,`step(0) assert(not PlushLicense.allowed())`],
   ['revalidação normal','',`step(0) step(1000) assert(PlushLicense.allowed() and Mock.requests>1 and Mock.stops==0)`],
   ['código ausente',`Mock.key=''`,`step(0) assert(Mock.requests==0 and Mock.stops==1)`],
+  ['VOOK usa sua própria chave',`Mock.resource='vook_plush'; Mock.convars={vook_plush_license='VOOK-'..string.rep('A',64)}`,`step(0) assert(PlushLicense.allowed() and Mock.convar=='vook_plush_license' and Mock.event=='vook_plush:licenseReady')`],
+  ['True Blood usa sua própria chave',`Mock.convars={vook_plush_tb_license='VOOK-'..string.rep('B',64)}`,`step(0) assert(PlushLicense.allowed() and Mock.convar=='vook_plush_tb_license' and Mock.event=='vook_plush_tb:licenseReady')`],
+  ['True Blood não aceita chave configurada apenas para VOOK',`Mock.convars={vook_plush_license='VOOK-'..string.rep('A',64)}`,`step(0) assert(not PlushLicense.allowed() and Mock.requests==0 and Mock.stops==1)`],
 ];
 for(const [name,setup,assertions] of cases){
   const L=lauxlib.luaL_newstate();lualib.luaL_openlibs(L);

@@ -95,7 +95,7 @@ export const licenseButtons: ButtonHandler[] = Object.values(LICENSE_ACTION).map
         const l = await ownedLicense(requireArg(p, 0, 'licença'), i.user.id);
         if (action === 'key') {
             const key = await revealKey(l.id, i.user.id);
-            await replyV2(i, container().addTextDisplayComponents(heading('VOOK · Código de ativação'), text(`Mantenha este código privado. No server.cfg, antes do ensure:\n\`\`\`cfg\nset vook_plush_license "${key}"\n\`\`\`\nUse somente set, nunca setr ou sets. A licença não precisa de compra.`)));
+            await replyV2(i, container().addTextDisplayComponents(heading('VOOK · Código de ativação'), text(`Mantenha este código privado. Escolha SOMENTE a linha da edição que vai ativar, no server.cfg, antes do ensure.\n\n**VOOK padrão**\n\`\`\`cfg\nset vook_plush_license "${key}"\n\`\`\`\n**True Blood**\n\`\`\`cfg\nset vook_plush_tb_license "${key}"\n\`\`\`\nCada recurso/instalação possui vínculo próprio. Para usar as duas edições simultaneamente, solicite duas licenças. Use somente set, nunca setr ou sets. A licença não precisa de compra.`)));
         }
         else
             await replyV2(i, detailPanel(l));

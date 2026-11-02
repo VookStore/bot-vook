@@ -4,7 +4,8 @@ ATIVAÇÃO
 O módulo é habilitado com LICENSE_ENABLED=true nas variáveis da hospedagem.
 O deploy não emite licenças de teste: use /licenca criar para conceder acesso
 a uma pessoa. A emissão manual não depende do funcionamento das compras.
-O recurso instalado na cidade continua funcionando sem esta exigência.
+As instalações vook_plush e vook_plush_tb da base foram atualizadas para
+exigir autenticação. Cada recurso possui sua própria variável de licença.
 
 1. ATIVAR NO BOT / SHARDCLOUD
 
@@ -101,15 +102,16 @@ o Discord não oferece confirmação transacional junto ao banco do bot.
 
 4. AUTENTICAÇÃO NAS PELÚCIAS
 
-A cópia preparada está em:
-C:\Users\Enrick Mello\BOTS\pacotes\pelucias-licenciado\vook_plush_tb
+Instalações atualizadas:
+D:\BASE VOOK\Vook V2\resources\[standalone]\[Vook]\vook_plush
+D:\BASE VOOK\Vook V2\resources\[standalone]\[Vook]\vook_plush_tb
 
 O endereço informado em 02/11/2026 já está preenchido em server/license.lua:
 https://vook-auth.shardweb.app/v1/licenses/validate
 O preparador também usa esse endereço por padrão.
-Ela ainda NÃO deve substituir a instalada antes de publicar/habilitar a API
-no bot e emitir uma licença válida. Na verificação de 02/11/2026, /health
-exibiu a página "502 Bad Gateway" da ShardCloud, sem responder o JSON da API.
+A API foi habilitada e verificada em 02/11/2026: /health respondeu OK e uma
+chave inválida foi recusada. Emita e configure a licença antes de reiniciar
+os recursos atualizados. Nenhuma chave real foi incluída nos pacotes.
 
 Para produzir outra cópia com o endereço preenchido:
 node scripts/preparar-pelucias-licenciado.mjs "PASTA_ORIGINAL_DO_RECURSO" "NOVA_PASTA_DE_DESTINO" "https://vook-auth.shardweb.app"
@@ -120,9 +122,16 @@ O nome final da pasta no servidor deve continuar vook_plush_tb ou vook_plush.
 Mantenha os props vk_htyd, ox_inventory e qbx_core da instalação existente.
 O pacote de autenticação não substitui a instalação dos props/imagens.
 
-Antes do ensure, no server.cfg privado do cliente:
-set vook_plush_license "CODIGO_FORNECIDO_PELO_BOT"
+Antes do ensure, no server.cfg privado do cliente, escolha a edição:
+set vook_plush_license "CODIGO_DA_LICENCA_VOOK"
+ensure vook_plush
+
+Para True Blood:
+set vook_plush_tb_license "CODIGO_DA_LICENCA_TRUEBLOOD"
 ensure vook_plush_tb
+
+Se usar ambos, cada recurso exige sua própria licença (dois códigos).
+O nome do recurso determina a variável: <nome_do_recurso>_license.
 
 Use set, NUNCA setr/sets. Não coloque o código no config.lua compartilhado.
 Depois de emitir a licença e configurar o código/endereço, reinicie o recurso.

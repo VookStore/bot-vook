@@ -5,7 +5,8 @@ local resource = GetCurrentResourceName()
 local leaseUntil, stopped, pending = 0, false, false
 local requestSerial = 0
 local bootAt = os.time()
-local key = GetConvar('vook_plush_license', '')
+local keyConvar = resource .. '_license'
+local key = GetConvar(keyConvar, '')
 local installation = GetResourceKvpString('vook:license:installation')
 
 local function randomId()
@@ -27,7 +28,7 @@ end
 local function stop(reason)
     if stopped then return end
     stopped, leaseUntil = true, 0
-    print('[VOOK Auth] ' .. reason .. ' O recurso será encerrado; as coleções permanecem salvas.')
+    print('[VOOK Auth][' .. resource .. '] ' .. reason .. ' O recurso será encerrado; as coleções permanecem salvas.')
     StopResource(resource)
 end
 
@@ -63,8 +64,8 @@ local function validate()
         local first = leaseUntil == 0
         leaseUntil = deadline
         if first then
-            print('[VOOK Auth] Licença validada. Sistema liberado.')
-            TriggerEvent('vook_license:ready')
+            print('[VOOK Auth][' .. resource .. '] Licença validada. Sistema liberado.')
+            TriggerEvent(resource .. ':licenseReady')
         end
     end, 'POST', json.encode({ product = 'pelucias', resource = resource, installation = installation, nonce = nonce }),
         { ['Content-Type'] = 'application/json', ['Authorization'] = 'Bearer ' .. key }, { followLocation = false })
@@ -72,7 +73,7 @@ end
 
 CreateThread(function()
     if not ENDPOINT:match('^https://[^/]+/v1/licenses/validate$') then stop('Configure o endereço HTTPS de autenticação.') return end
-    if not key:match('^VOOK%-%x+$') or #key ~= 69 then stop('Configure set vook_plush_license no server.cfg.') return end
+    if not key:match('^VOOK%-%x+$') or #key ~= 69 then stop('Configure set ' .. keyConvar .. ' no server.cfg.') return end
     if GetResourceKvpString('vook:license:installation') ~= installation then stop('Falha ao salvar o vínculo local.') return end
     local nextCheck = 0
     while not stopped do
