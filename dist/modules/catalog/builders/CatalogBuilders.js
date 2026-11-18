@@ -19,6 +19,7 @@ const v2_1 = require("../../../components/v2");
 const money_1 = require("../../../utils/money");
 const sanitize_1 = require("../../../utils/sanitize");
 const packValidators_1 = require("../validators/packValidators");
+const scriptProducts_1 = require("../scriptProducts");
 const catalog_1 = require("../types/catalog");
 /**
  * Vitrine do catalogo (Components V2).
@@ -60,6 +61,8 @@ function catalogHomeButton(label = 'Abrir Catalogo') {
 }
 /** Preco exibido: produto sem preco valido nunca aparece como comprável. */
 function priceLabel(pack) {
+    if ((0, scriptProducts_1.isScriptPreview)(pack))
+        return 'Em breve · apresentação';
     return (0, packValidators_1.hasSellablePrice)(pack.price) ? (0, money_1.formatCents)(pack.price) : 'Indisponivel';
 }
 // ---------------------------------------------------------------------------
@@ -84,7 +87,8 @@ function buildCatalogPanel(config, stats) {
         ['Categorias', String(stats.categories)],
     ])));
     root.addSeparatorComponents((0, v2_1.separator)());
-    root.addActionRowComponents((0, v2_1.buttonRow)(catalogHomeButton(), cartButton(), ordersButton()));
+    root.addActionRowComponents((0, v2_1.buttonRow)(catalogHomeButton(), cartButton(), ordersButton(), new discord_js_1.ButtonBuilder().setCustomId((0, customIds_1.buildCustomId)(customIds_1.NAMESPACE.LICENSE, customIds_1.LICENSE_ACTION.LIST, '0'))
+        .setLabel('Meus Scripts').setStyle(discord_js_1.ButtonStyle.Secondary)));
     root.addTextDisplayComponents((0, v2_1.footerNote)('Sua loja, seu carrinho e seus pedidos aparecem apenas para voce.'));
     return root;
 }
@@ -104,7 +108,7 @@ function buildCatalogHome(params) {
     if (highlight !== undefined) {
         root.addTextDisplayComponents((0, v2_1.text)(`${branding_1.EMOJIS.FEATURED} **DESTAQUE**\n\n**${highlight.name}**\n` +
             `${(0, sanitize_1.truncate)(highlight.shortDescription ?? 'Pack disponivel na Vook Store.', limits_1.BUSINESS_LIMITS.PACK_SHORT_DESCRIPTION_MAX)}\n\n` +
-            `**A partir de**\n${priceLabel(highlight)}`));
+            `**${(0, scriptProducts_1.isScriptPreview)(highlight) ? 'Disponibilidade' : 'A partir de'}**\n${priceLabel(highlight)}`));
         root.addActionRowComponents((0, v2_1.buttonRow)(catalogButton(customIds_1.CATALOG_ACTION.PACK_VIEW, '👀', 'Visualizar', highlight.id, '0')));
         root.addSeparatorComponents((0, v2_1.separator)());
     }
@@ -261,22 +265,25 @@ function buildPackCard(params) {
         ...(pack.sku !== null ? [['SKU', `\`${pack.sku}\``]] : []),
         ['Imagens', total === 0 ? 'Nenhuma imagem cadastrada' : `Imagem ${index + 1} de ${total}`],
     ]));
-    lines.push(`**PRECO**\n# ${priceLabel(pack)}`);
+    lines.push(`**${(0, scriptProducts_1.isScriptPreview)(pack) ? 'DISPONIBILIDADE' : 'PRECO'}**\n# ${priceLabel(pack)}`);
     root.addTextDisplayComponents((0, v2_1.text)(lines.join('\n\n')));
     root.addSeparatorComponents((0, v2_1.separator)());
-    const sellable = (0, packValidators_1.hasSellablePrice)(pack.price) && pack.enabled;
+    const preview = (0, scriptProducts_1.isScriptPreview)(pack);
+    const sellable = !preview && (0, packValidators_1.hasSellablePrice)(pack.price) && pack.enabled;
     const actions = [];
     // Com uma imagem so, a navegacao some: dois botoes que nao levam a lugar
     // nenhum sujam o card e confundem o cliente.
     if (total > 1) {
         actions.push(catalogButton(customIds_1.CATALOG_ACTION.IMAGE_PREV, branding_1.EMOJIS.PREVIOUS, 'Anterior', pack.id, String(index)), catalogButton(customIds_1.CATALOG_ACTION.IMAGE_NEXT, branding_1.EMOJIS.NEXT, 'Proxima', pack.id, String(index)));
     }
-    actions.push(catalogButton(customIds_1.CATALOG_ACTION.CART_ADD, branding_1.EMOJIS.CART, 'Adicionar ao Carrinho', pack.id)
-        .setDisabled(!sellable || params.inCart === true), catalogButton(customIds_1.CATALOG_ACTION.BUY, branding_1.EMOJIS.BUY_NOW, 'Comprar Agora', pack.id).setDisabled(!sellable));
-    root.addActionRowComponents((0, v2_1.buttonRow)(...actions.slice(0, limits_1.DISCORD_LIMITS.BUTTONS_PER_ROW)));
+    if (!preview)
+        actions.push(catalogButton(customIds_1.CATALOG_ACTION.CART_ADD, branding_1.EMOJIS.CART, 'Adicionar ao Carrinho', pack.id)
+            .setDisabled(!sellable || params.inCart === true), catalogButton(customIds_1.CATALOG_ACTION.BUY, branding_1.EMOJIS.BUY_NOW, 'Comprar Agora', pack.id).setDisabled(!sellable));
+    if (actions.length)
+        root.addActionRowComponents((0, v2_1.buttonRow)(...actions.slice(0, limits_1.DISCORD_LIMITS.BUTTONS_PER_ROW)));
     root.addActionRowComponents((0, v2_1.buttonRow)(catalogButton(customIds_1.CATALOG_ACTION.PACK_INFO, branding_1.EMOJIS.INFO, 'Mais Informacoes', pack.id), catalogHomeButton('Voltar ao Catalogo'), cartButton()));
     if (!sellable) {
-        root.addTextDisplayComponents((0, v2_1.footerNote)('Este pack esta indisponivel para compra no momento.'));
+        root.addTextDisplayComponents((0, v2_1.footerNote)(preview ? scriptProducts_1.SCRIPT_PREVIEW_NOTICE : 'Este pack esta indisponivel para compra no momento.'));
     }
     else if (params.inCart === true) {
         root.addTextDisplayComponents((0, v2_1.footerNote)('Este pack ja esta no seu carrinho.'));
@@ -306,7 +313,7 @@ function buildPackDetails(view) {
         ['Imagens', String(images.length)],
     ])));
     root.addActionRowComponents((0, v2_1.buttonRow)(catalogButton(customIds_1.CATALOG_ACTION.PACK_VIEW, branding_1.EMOJIS.BACK, 'Voltar ao Pack', pack.id, '0'), catalogButton(customIds_1.CATALOG_ACTION.CART_ADD, branding_1.EMOJIS.CART, 'Adicionar ao Carrinho', pack.id)
-        .setDisabled(!(0, packValidators_1.hasSellablePrice)(pack.price) || !pack.enabled), catalogHomeButton('Catalogo')));
+        .setDisabled((0, scriptProducts_1.isScriptPreview)(pack) || !(0, packValidators_1.hasSellablePrice)(pack.price) || !pack.enabled), catalogHomeButton('Catalogo')));
     return root;
 }
 //# sourceMappingURL=CatalogBuilders.js.map

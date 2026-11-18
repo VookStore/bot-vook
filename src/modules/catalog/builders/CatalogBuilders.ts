@@ -8,7 +8,7 @@ import {
 import type { CatalogCategory, CatalogPack, GuildConfig, PackImage } from '@prisma/client';
 
 import { COLORS, EMOJIS, TITLES } from '../../../constants/branding';
-import { CART_ACTION, CATALOG_ACTION, NAMESPACE, ORDER_ACTION, buildCustomId } from '../../../constants/customIds';
+import { CART_ACTION, CATALOG_ACTION, NAMESPACE, ORDER_ACTION, LICENSE_ACTION, buildCustomId } from '../../../constants/customIds';
 import { BUSINESS_LIMITS, DISCORD_LIMITS } from '../../../constants/limits';
 import {
   addHeader,
@@ -24,6 +24,7 @@ import {
 import { formatCents } from '../../../utils/money';
 import { truncate } from '../../../utils/sanitize';
 import { hasSellablePrice } from '../validators/packValidators';
+import { isScriptPreview, SCRIPT_PREVIEW_NOTICE } from '../scriptProducts';
 import { ALL_CATEGORIES_VALUE, type PackView } from '../types/catalog';
 
 /**
@@ -77,6 +78,7 @@ export function catalogHomeButton(label = 'Abrir Catalogo'): ButtonBuilder {
 
 /** Preco exibido: produto sem preco valido nunca aparece como comprável. */
 function priceLabel(pack: CatalogPack): string {
+  if (isScriptPreview(pack)) return 'Em breve · apresentação';
   return hasSellablePrice(pack.price) ? formatCents(pack.price) : 'Indisponivel';
 }
 
@@ -116,7 +118,9 @@ export function buildCatalogPanel(
   );
 
   root.addSeparatorComponents(separator());
-  root.addActionRowComponents(buttonRow(catalogHomeButton(), cartButton(), ordersButton()));
+  root.addActionRowComponents(buttonRow(catalogHomeButton(), cartButton(), ordersButton(),
+    new ButtonBuilder().setCustomId(buildCustomId(NAMESPACE.LICENSE, LICENSE_ACTION.LIST, '0'))
+      .setLabel('Meus Scripts').setStyle(ButtonStyle.Secondary)));
   root.addTextDisplayComponents(
     footerNote('Sua loja, seu carrinho e seus pedidos aparecem apenas para voce.'),
   );
@@ -157,7 +161,7 @@ export function buildCatalogHome(params: CatalogHomeParams): ContainerBuilder {
       text(
         `${EMOJIS.FEATURED} **DESTAQUE**\n\n**${highlight.name}**\n` +
           `${truncate(highlight.shortDescription ?? 'Pack disponivel na Vook Store.', BUSINESS_LIMITS.PACK_SHORT_DESCRIPTION_MAX)}\n\n` +
-          `**A partir de**\n${priceLabel(highlight)}`,
+          `**${isScriptPreview(highlight) ? 'Disponibilidade' : 'A partir de'}**\n${priceLabel(highlight)}`,
       ),
     );
     root.addActionRowComponents(
@@ -442,12 +446,13 @@ export function buildPackCard(params: PackCardParams): ContainerBuilder {
     ]),
   );
 
-  lines.push(`**PRECO**\n# ${priceLabel(pack)}`);
+  lines.push(`**${isScriptPreview(pack) ? 'DISPONIBILIDADE' : 'PRECO'}**\n# ${priceLabel(pack)}`);
 
   root.addTextDisplayComponents(text(lines.join('\n\n')));
   root.addSeparatorComponents(separator());
 
-  const sellable = hasSellablePrice(pack.price) && pack.enabled;
+  const preview = isScriptPreview(pack);
+  const sellable = !preview && hasSellablePrice(pack.price) && pack.enabled;
   const actions: ButtonBuilder[] = [];
 
   // Com uma imagem so, a navegacao some: dois botoes que nao levam a lugar
@@ -459,7 +464,7 @@ export function buildPackCard(params: PackCardParams): ContainerBuilder {
     );
   }
 
-  actions.push(
+  if (!preview) actions.push(
     catalogButton(CATALOG_ACTION.CART_ADD, EMOJIS.CART, 'Adicionar ao Carrinho', pack.id)
       .setDisabled(!sellable || params.inCart === true),
     catalogButton(CATALOG_ACTION.BUY, EMOJIS.BUY_NOW, 'Comprar Agora', pack.id).setDisabled(
@@ -467,7 +472,7 @@ export function buildPackCard(params: PackCardParams): ContainerBuilder {
     ),
   );
 
-  root.addActionRowComponents(buttonRow(...actions.slice(0, DISCORD_LIMITS.BUTTONS_PER_ROW)));
+  if (actions.length) root.addActionRowComponents(buttonRow(...actions.slice(0, DISCORD_LIMITS.BUTTONS_PER_ROW)));
   root.addActionRowComponents(
     buttonRow(
       catalogButton(CATALOG_ACTION.PACK_INFO, EMOJIS.INFO, 'Mais Informacoes', pack.id),
@@ -478,7 +483,7 @@ export function buildPackCard(params: PackCardParams): ContainerBuilder {
 
   if (!sellable) {
     root.addTextDisplayComponents(
-      footerNote('Este pack esta indisponivel para compra no momento.'),
+      footerNote(preview ? SCRIPT_PREVIEW_NOTICE : 'Este pack esta indisponivel para compra no momento.'),
     );
   } else if (params.inCart === true) {
     root.addTextDisplayComponents(footerNote('Este pack ja esta no seu carrinho.'));
@@ -533,7 +538,7 @@ export function buildPackDetails(view: PackView): ContainerBuilder {
     buttonRow(
       catalogButton(CATALOG_ACTION.PACK_VIEW, EMOJIS.BACK, 'Voltar ao Pack', pack.id, '0'),
       catalogButton(CATALOG_ACTION.CART_ADD, EMOJIS.CART, 'Adicionar ao Carrinho', pack.id)
-        .setDisabled(!hasSellablePrice(pack.price) || !pack.enabled),
+        .setDisabled(isScriptPreview(pack) || !hasSellablePrice(pack.price) || !pack.enabled),
       catalogHomeButton('Catalogo'),
     ),
   );

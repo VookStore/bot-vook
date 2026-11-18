@@ -11,6 +11,11 @@ const config_1 = require("./config");
 const crypto_1 = require("./crypto");
 const service_1 = require("./service");
 const panel_1 = require("./panel");
+const packages_1 = require("./packages");
+const releases_1 = require("./releases");
+const downloadLinks_1 = require("./downloadLinks");
+const download_1 = require("../../utils/download");
+const products_1 = require("./products");
 const customIds_1 = require("../../constants/customIds");
 async function assertLicenseAdmin(i) {
     const c = (0, config_1.requireLicenses)();
@@ -26,8 +31,9 @@ async function assertLicenseAdmin(i) {
 }
 const choices = Object.keys(crypto_1.PLANS).map(value => ({ name: value === 'vitalicio' ? 'Vitalício' : value, value }));
 const builder = new discord_js_1.SlashCommandBuilder().setName('licenca').setDescription('Administração de licenças VOOK').setDMPermission(false)
-    .addSubcommand(s => s.setName('criar').setDescription('Conceder uma licença manualmente')
+    .addSubcommand(s => s.setName('criar').setDescription('Nova concessão: Testes e Produção; anteriores são preservadas')
     .addStringOption(o => o.setName('plano').setDescription('Validade da licença').setRequired(true).addChoices(...choices))
+    .addStringOption(o => o.setName('produto').setDescription('Produto licenciado; padrão: Sistema Base').addChoices(...(0, products_1.commercialProducts)().map(([value, p]) => ({ name: p.label, value }))))
     .addUserOption(o => o.setName('usuario').setDescription('Cliente'))
     .addStringOption(o => o.setName('discord_id').setDescription('ID do cliente, se não selecionou usuário'))
     .addBooleanOption(o => o.setName('iniciar_agora').setDescription('Iniciar validade agora; padrão: primeiro uso')))
@@ -42,10 +48,27 @@ const builder = new discord_js_1.SlashCommandBuilder().setName('licenca').setDes
 for (const op of ['suspender', 'reativar', 'desvincular'])
     builder.addSubcommand(s => s.setName(op).setDescription(`${op} licença`)
         .addStringOption(o => o.setName('id').setDescription('ID da licença').setRequired(true)));
+builder.addSubcommand(s => s.setName('pacote_cadastrar').setDescription('Cadastrar ZIP final como rascunho, sem liberar ao cliente')
+    .addStringOption(o => o.setName('produto').setDescription('Produto').setRequired(true).addChoices(...Object.entries(products_1.PRODUCTS).map(([value, p]) => ({ name: p.label, value }))))
+    .addStringOption(o => o.setName('recurso').setDescription('Nome exato do recurso').setRequired(true).addChoices(...[...new Set(Object.values(products_1.PRODUCTS).flatMap(p => [...p.resources]))].map(value => ({ name: value, value }))))
+    .addStringOption(o => o.setName('versao').setDescription('Versão final: 1.2.3').setRequired(true))
+    .addAttachmentOption(o => o.setName('arquivo').setDescription('ZIP preparado, sem licenças reais ou arquivos de testes').setRequired(true)));
+builder.addSubcommand(s => s.setName('pacote_publicar').setDescription('Liberar versão revisada para clientes licenciados')
+    .addStringOption(o => o.setName('id').setDescription('ID do rascunho').setRequired(true))
+    .addStringOption(o => o.setName('sha256').setDescription('SHA-256 do arquivo revisado').setRequired(true))
+    .addBooleanOption(o => o.setName('revisado').setDescription('Confirmo: versão final, testada, sem dados de clientes, testes ou segredos').setRequired(true)));
+builder.addSubcommand(s => s.setName('pacote_retirar').setDescription('Impedir novos downloads de uma versão')
+    .addStringOption(o => o.setName('id').setDescription('ID do pacote').setRequired(true)));
+builder.addSubcommand(s => s.setName('pacotes').setDescription('Consultar rascunhos e versões publicadas')
+    .addIntegerOption(o => o.setName('pagina').setDescription('Página').setMinValue(1)));
 exports.licenseCommand = { builder, async execute(i) {
         await i.deferReply({ flags: 64 });
         await assertLicenseAdmin(i);
         const op = i.options.getSubcommand();
+        if (op.startsWith('pacote')) {
+            await handlePackageCommand(i, op);
+            return;
+        }
         if (op === 'listar') {
             const id = i.options.getString('discord_id', true);
             if (!/^\d{17,20}$/.test(id))
@@ -74,7 +97,12 @@ exports.licenseCommand = { builder, async execute(i) {
             const plan = i.options.getString('plano', true);
             if (!(0, crypto_1.isPlan)(plan))
                 throw new errors_1.ValidationError('Plano inválido.');
-            l = await (0, service_1.createLicense)(recipient.id, plan, i.user.id, !i.options.getBoolean('iniciar_agora'));
+            const product = i.options.getString('produto') || 'pelucias_base';
+            if (!(0, products_1.isProduct)(product) || !products_1.PRODUCTS[product].commercial)
+                throw new errors_1.ValidationError('Escolha um produto comercial. Licenças anteriores são preservadas e administradas por ID.');
+            const result = await (0, service_1.createLicense)(recipient.id, plan, i.user.id, !i.options.getBoolean('iniciar_agora'), product);
+            await (0, reply_1.replyV2)(i, (0, v2_1.container)().addTextDisplayComponents((0, v2_1.heading)(result.created ? 'VOOK · Par de licenças criado' : 'VOOK · Licenças existentes preservadas'), (0, v2_1.text)(result.created ? result.licenses.map(panel_1.details).join('\n\n') : 'Este cliente já possui licença(s) deste produto. Nenhuma chave, validade ou vínculo foi alterado e nenhuma licença adicional foi criada. Consulte /licenca listar.'), (0, v2_1.text)(`Cliente: <@${recipient.id}>\n${result.created ? 'Avisos adicionados à fila do privado. O cliente pode baixar pelo /planos quando houver pacote publicado.' : 'Reenvios e downloads usam as mesmas licenças. Renovação e alterações continuam por ID.'}`)));
+            return;
         }
         else {
             if (!['renovar', 'suspender', 'reativar', 'desvincular'].includes(op))
@@ -96,11 +124,62 @@ exports.licenseButtons = Object.values(customIds_1.LICENSE_ACTION).map(action =>
             return;
         }
         const l = await (0, service_1.ownedLicense)((0, customIds_1.requireArg)(p, 0, 'licença'), i.user.id);
-        if (action === 'key') {
+        if (action === 'packages') {
+            await (0, reply_1.replyV2)(i, await (0, panel_1.packagesPanel)(l.id, i.user.id, Number(p.args[1])));
+        }
+        else if (action === 'download') {
+            await (0, releases_1.withPackageJob)(async () => {
+                const releaseId = (0, customIds_1.requireArg)(p, 1, 'versão');
+                let file;
+                try {
+                    file = await (0, releases_1.prepareDownload)(l.id, releaseId, i.user.id, i.attachmentSizeLimit);
+                }
+                catch (error) {
+                    if (!(error instanceof releases_1.AttachmentLimitError))
+                        throw error;
+                    const url = await (0, downloadLinks_1.issueDownloadLink)(l.id, releaseId, i.user.id);
+                    await (0, reply_1.replyV2)(i, (0, v2_1.container)().addTextDisplayComponents((0, v2_1.heading)('VOOK · Download privado'), (0, v2_1.text)(`${(0, panel_1.details)(l)}\n\nEste pacote excede o limite de anexos do Discord. O link abaixo funciona uma vez e expira em **5 minutos**. A licença será configurada no ZIP. Não compartilhe o link nem o arquivo. Se expirar ou falhar, gere outro em /planos.`))
+                        .addActionRowComponents((0, v2_1.buttonRow)(new discord_js_1.ButtonBuilder().setStyle(discord_js_1.ButtonStyle.Link).setLabel('Baixar meu pacote').setURL(url))));
+                    return;
+                }
+                await (0, reply_1.replyV2)(i, (0, v2_1.container)().addTextDisplayComponents((0, v2_1.heading)('VOOK · Seu script está pronto'), (0, v2_1.text)(`${(0, panel_1.details)(file.license)}\n\nVersão: **${file.release.version}** · Recurso: **${file.release.resource}**\nLicença já configurada. Extraia o ZIP, siga INSTALACAO-VOOK.txt e instale somente no ambiente indicado. Não compartilhe este arquivo.`))
+                    .addFileComponents(new discord_js_1.FileBuilder().setURL(`attachment://${file.name}`)), { files: [new discord_js_1.AttachmentBuilder(file.bytes, { name: file.name })] });
+            });
+        }
+        else if (action === 'key') {
             const key = await (0, service_1.revealKey)(l.id, i.user.id);
-            await (0, reply_1.replyV2)(i, (0, v2_1.container)().addTextDisplayComponents((0, v2_1.heading)('VOOK · Código de ativação'), (0, v2_1.text)(`Mantenha este código privado. Escolha SOMENTE a linha da edição que vai ativar, no server.cfg, antes do ensure.\n\n**VOOK padrão**\n\`\`\`cfg\nset vook_plush_license "${key}"\n\`\`\`\n**True Blood**\n\`\`\`cfg\nset vook_plush_tb_license "${key}"\n\`\`\`\nCada recurso/instalação possui vínculo próprio. Para usar as duas edições simultaneamente, solicite duas licenças. Use somente set, nunca setr ou sets. A licença não precisa de compra.`)));
+            await (0, reply_1.replyV2)(i, (0, v2_1.container)().addTextDisplayComponents((0, v2_1.heading)('VOOK · Código de ativação'), (0, v2_1.text)((0, products_1.activationInstructions)(l.product, key))));
         }
         else
             await (0, reply_1.replyV2)(i, (0, panel_1.detailPanel)(l));
     } }));
+async function handlePackageCommand(i, op) {
+    if (op === 'pacotes') {
+        const page = (i.options.getInteger('pagina') || 1) - 1;
+        const rows = await (0, prisma_1.getPrisma)().scriptRelease.findMany({ where: { guildId: (0, config_1.requireLicenses)().guildId }, select: releases_1.releaseMetadata, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: Math.min(page, 100000) * 5, take: 5 });
+        await (0, reply_1.replyV2)(i, (0, v2_1.container)().addTextDisplayComponents((0, v2_1.heading)(`VOOK · Pacotes · Página ${page + 1}`), (0, v2_1.text)(rows.length ? rows.map(r => `**${r.resource} · ${r.version} · ${r.status}**\nID: \`${r.id}\`\nSHA-256: \`${r.sha256}\``).join('\n\n') : 'Nenhum pacote cadastrado nesta página.')));
+        return;
+    }
+    if (op === 'pacote_retirar') {
+        await (0, releases_1.withdrawRelease)(i.options.getString('id', true), i.user.id);
+        await (0, reply_1.replyV2)(i, (0, v2_1.container)().addTextDisplayComponents((0, v2_1.text)('Versão retirada dos downloads. As licenças e os arquivos já recebidos permanecem inalterados.')));
+        return;
+    }
+    await (0, releases_1.withPackageJob)(async () => {
+        if (op === 'pacote_publicar') {
+            const r = await (0, releases_1.publishRelease)(i.options.getString('id', true), i.options.getString('sha256', true), i.user.id, i.options.getBoolean('revisado', true));
+            await (0, reply_1.replyV2)(i, (0, v2_1.container)().addTextDisplayComponents((0, v2_1.text)(`**${r.resource} · ${r.version}** publicado. Clientes com licença válida do produto podem baixar em /planos.`)));
+            return;
+        }
+        if (op !== 'pacote_cadastrar')
+            (0, packages_1.packageError)('Operação desconhecida.');
+        const attachment = i.options.getAttachment('arquivo', true);
+        const limit = (0, packages_1.archiveLimit)(i.options.getString('produto', true));
+        if (!attachment.name.toLowerCase().endsWith('.zip') || attachment.size > limit)
+            (0, packages_1.packageError)(`Envie um ZIP de até ${limit / 1024 / 1024} MiB.`);
+        const { bytes } = await (0, download_1.downloadDiscordAttachment)(attachment.url, limit, 120000);
+        const r = await (0, releases_1.registerRelease)(i.options.getString('produto', true), i.options.getString('recurso', true), i.options.getString('versao', true), bytes, i.user.id);
+        await (0, reply_1.replyV2)(i, (0, v2_1.container)().addTextDisplayComponents((0, v2_1.heading)('VOOK · Pacote cadastrado'), (0, v2_1.text)(`**${r.resource} · ${r.version} · ${r.status}**\n${r.fileCount} arquivos\nID: \`${r.id}\`\nSHA-256: \`${r.sha256}\`\n\nRascunhos não são entregues. Revise o conteúdo e teste a instalação antes de usar /licenca pacote_publicar com este ID e SHA-256.`)));
+    });
+}
 //# sourceMappingURL=commands.js.map

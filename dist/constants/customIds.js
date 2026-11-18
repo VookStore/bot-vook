@@ -39,7 +39,7 @@ exports.NAMESPACE = {
     DELIVERY: 'delivery',
     INFLUENCER: 'influencer',
 };
-exports.LICENSE_ACTION = { LIST: 'list', VIEW: 'view', KEY: 'key' };
+exports.LICENSE_ACTION = { LIST: 'list', VIEW: 'view', KEY: 'key', PACKAGES: 'packages', DOWNLOAD: 'download' };
 /**
  * Monta um customId validado.
  * Lanca ValidationError quando o resultado excede o limite do Discord — assim o

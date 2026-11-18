@@ -38,7 +38,7 @@ export const NAMESPACE = {
 } as const;
 
 export type Namespace = (typeof NAMESPACE)[keyof typeof NAMESPACE];
-export const LICENSE_ACTION = { LIST: 'list', VIEW: 'view', KEY: 'key' } as const;
+export const LICENSE_ACTION = { LIST: 'list', VIEW: 'view', KEY: 'key', PACKAGES: 'packages', DOWNLOAD: 'download' } as const;
 
 export interface ParsedCustomId {
   namespace: string;

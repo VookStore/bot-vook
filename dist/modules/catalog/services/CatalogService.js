@@ -34,6 +34,7 @@ const CatalogPackRepository_1 = require("../repositories/CatalogPackRepository")
 const PackImageRepository_1 = require("../repositories/PackImageRepository");
 const CatalogCategoryService_1 = require("./CatalogCategoryService");
 const packValidators_1 = require("../validators/packValidators");
+const scriptProducts_1 = require("../scriptProducts");
 /**
  * Catalogo de produtos.
  *
@@ -86,6 +87,9 @@ async function getSellablePack(guildId, packId) {
             userMessage: 'Este pack nao existe mais. Atualize o catalogo e tente novamente.',
             context: { guildId, entityType: 'pack', entityId: packId },
         });
+    }
+    if ((0, scriptProducts_1.isScriptPreview)(pack)) {
+        throw new errors_1.ValidationError(scriptProducts_1.SCRIPT_PREVIEW_NOTICE, { userMessage: scriptProducts_1.SCRIPT_PREVIEW_NOTICE });
     }
     if (!pack.enabled) {
         throw new errors_1.ValidationError(`Pack desativado: ${packId}`, {

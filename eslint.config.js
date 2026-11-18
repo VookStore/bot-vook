@@ -17,6 +17,10 @@ module.exports = tseslint.config(
       'node_modules/**',
       'prisma/migrations/**',
       'coverage/**',
+      '.tmp/**',
+      'tmp/**',
+      'backups/**',
+      'pacotes/**',
       // Configuracao CommonJS: fora do projeto TypeScript tipado.
       'eslint.config.js',
       'ecosystem.config.js',

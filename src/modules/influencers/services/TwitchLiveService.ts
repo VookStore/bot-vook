@@ -72,7 +72,7 @@ export async function announceTwitchLives(client: Client): Promise<number> {
 
   const query = new URLSearchParams();
   for (const login of logins.slice(0, 100)) query.append('user_login', login);
-  const response = await fetch(`https://api.twitch.tv/helix/streams?${query}`, {
+  const response = await fetch(`https://api.twitch.tv/helix/streams?${query.toString()}`, {
     headers: { 'Client-Id': env.TWITCH_CLIENT_ID, Authorization: `Bearer ${await token()}` },
   });
   if (!response.ok) throw new Error(`Twitch Helix respondeu ${response.status}`);

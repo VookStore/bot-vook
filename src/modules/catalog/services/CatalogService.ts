@@ -36,6 +36,7 @@ import {
   type PackDetailInput,
 } from '../validators/packValidators';
 import type { PackView } from '../types/catalog';
+import { isScriptPreview, SCRIPT_PREVIEW_NOTICE } from '../scriptProducts';
 
 /**
  * Catalogo de produtos.
@@ -112,6 +113,9 @@ export async function getSellablePack(
       userMessage: 'Este pack nao existe mais. Atualize o catalogo e tente novamente.',
       context: { guildId, entityType: 'pack', entityId: packId },
     });
+  }
+  if (isScriptPreview(pack)) {
+    throw new ValidationError(SCRIPT_PREVIEW_NOTICE, { userMessage: SCRIPT_PREVIEW_NOTICE });
   }
   if (!pack.enabled) {
     throw new ValidationError(`Pack desativado: ${packId}`, {

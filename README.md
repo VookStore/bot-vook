@@ -1440,3 +1440,8 @@ Pontos onde havia mais de um caminho razoável e a escolha foi deliberada:
 ## Licença
 
 Uso interno da Vook Store.
+
+
+## Catálogo de sistemas e coleções
+
+As quatro ofertas padrão, os arquivos por produto e os procedimentos de publicação estão em [Catálogo de coleções](docs/catalogo-colecoes.md). As novas ofertas ficam em apresentação, sem compras ou pagamentos. TrueBlood permanece privada.

@@ -18,6 +18,7 @@ const CatalogPackRepository_1 = require("../repositories/CatalogPackRepository")
 const CatalogCategoryService_1 = require("./CatalogCategoryService");
 const CatalogService_1 = require("./CatalogService");
 const packValidators_1 = require("../validators/packValidators");
+const scriptProducts_1 = require("../scriptProducts");
 /**
  * Carrinho do cliente.
  *
@@ -74,6 +75,8 @@ async function getCartView(guildId, customerId) {
 function unavailableReason(pack, enabledCategories) {
     if (pack.deletedAt !== null)
         return 'Produto removido do catalogo.';
+    if ((0, scriptProducts_1.isScriptPreview)(pack))
+        return scriptProducts_1.SCRIPT_PREVIEW_NOTICE;
     if (!pack.enabled)
         return 'Produto indisponivel no momento.';
     if (!enabledCategories.has(pack.categoryId))

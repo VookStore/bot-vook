@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.licenseStatus = licenseStatus;
 exports.serial = serial;
+exports.environmentLabel = environmentLabel;
 exports.createLicense = createLicense;
 exports.ownedLicense = ownedLicense;
 exports.revealKey = revealKey;
@@ -13,6 +14,7 @@ const prisma_1 = require("../../core/database/prisma");
 const errors_1 = require("../../core/errors");
 const config_1 = require("./config");
 const crypto_1 = require("./crypto");
+const products_1 = require("./products");
 function licenseStatus(l, now = new Date()) {
     if (l.state !== 'ACTIVE')
         return 'Suspensa';
@@ -36,19 +38,42 @@ async function serial(fn) {
 async function event(tx, l, kind, actorId, message, dedupe = (0, node_crypto_1.randomUUID)()) {
     return tx.scriptLicenseEvent.create({ data: { licenseId: l.id, kind, actorId, message, dedupe } });
 }
-async function createLicense(ownerId, plan, actorId, startsOnUse = true) {
+function environmentLabel(environment) {
+    return environment === 'TEST' ? 'Testes/Desenvolvimento' : environment === 'PRODUCTION' ? 'Produção (servidor público)' : 'Licença anterior · vínculo preservado';
+}
+// One grant per customer/product. Retrying creation or delivery never adds keys.
+async function createLicense(ownerId, plan, actorId, startsOnUse = true, product = 'pelucias') {
     const c = (0, config_1.requireLicenses)();
-    if (!/^\d{17,20}$/.test(ownerId) || !(0, crypto_1.isPlan)(plan))
+    if (!/^\d{17,20}$/.test(ownerId) || !(0, crypto_1.isPlan)(plan) || !(0, products_1.isProduct)(product))
         throw new errors_1.ValidationError('Destinatário ou plano inválido.');
-    const key = (0, crypto_1.newLicenseKey)();
     const now = new Date();
-    return serial(async (tx) => {
-        const l = await tx.scriptLicense.create({ data: { guildId: c.guildId, ownerId, product: 'pelucias', plan,
-                keyHash: (0, crypto_1.digest)(key), keyCipher: (0, crypto_1.encryptKey)(key, c.secret), keySuffix: key.slice(-6), startsOnUse,
-                expiresAt: startsOnUse ? null : (0, crypto_1.expiry)(plan, now) } });
-        await event(tx, l, 'CREATED', actorId, `Sua licença de Pelúcias foi criada. Plano: ${plan}. ${startsOnUse ? 'A validade começa na primeira ativação.' : 'A validade começa agora.'}`);
-        return l;
-    });
+    // The unique issuance also covers concurrent transactions in different bot processes.
+    for (let attempt = 0;; attempt++) {
+        try {
+            return await serial(async (tx) => {
+                const existing = await tx.scriptLicense.findMany({ where: { guildId: c.guildId, ownerId, product }, orderBy: { createdAt: 'asc' } });
+                if (existing.length)
+                    return { licenses: existing, created: false };
+                const issuance = await tx.scriptLicenseIssuance.create({ data: { guildId: c.guildId, ownerId, product } });
+                const licenses = [];
+                for (const environment of ['TEST', 'PRODUCTION']) {
+                    const key = (0, crypto_1.newLicenseKey)();
+                    const l = await tx.scriptLicense.create({ data: { guildId: c.guildId, ownerId, product, plan,
+                            issuanceId: issuance.id, environment,
+                            keyHash: (0, crypto_1.digest)(key), keyCipher: (0, crypto_1.encryptKey)(key, c.secret), keySuffix: key.slice(-6), startsOnUse,
+                            expiresAt: startsOnUse ? null : (0, crypto_1.expiry)(plan, now) } });
+                    await event(tx, l, 'CREATED', actorId, `Sua licença de ${(0, products_1.productLabel)(product)} · ${environmentLabel(environment)} foi criada. Plano: ${plan}. ${startsOnUse ? 'A validade começa na primeira ativação deste ambiente.' : 'A validade começa agora.'} Baixe o script em /planos quando a versão estiver publicada.`);
+                    licenses.push(l);
+                }
+                return { licenses, created: true };
+            });
+        }
+        catch (error) {
+            if (attempt < 3 && error instanceof client_1.Prisma.PrismaClientKnownRequestError && error.code === 'P2002')
+                continue;
+            throw error;
+        }
+    }
 }
 async function ownedLicense(id, userId) {
     const c = (0, config_1.requireLicenses)();
@@ -96,7 +121,7 @@ async function changeLicense(id, actorId, operation, plan) {
 async function validateLicense(key, input) {
     const c = (0, config_1.requireLicenses)();
     const deny = (reason) => ({ valid: false, reason, nonce: input.nonce });
-    if (!/^VOOK-[A-F\d]{64}$/.test(key) || input.product !== 'pelucias' || !['vook_plush', 'vook_plush_tb'].includes(input.resource)
+    if (!/^VOOK-[A-F\d]{64}$/.test(key) || !(0, products_1.isProduct)(input.product) || !products_1.PRODUCTS[input.product].resources.includes(input.resource)
         || !/^[a-zA-Z\d_-]{24,128}$/.test(input.installation) || !/^[a-zA-Z\d_-]{16,128}$/.test(input.nonce))
         return deny('invalid');
     return serial(async (tx) => {
@@ -109,7 +134,7 @@ async function validateLicense(key, input) {
         if (l.expiresAt && l.expiresAt <= now)
             return deny('expired');
         const hash = (0, crypto_1.digest)(input.installation);
-        if (l.installationHash && l.installationHash !== hash)
+        if ((l.installationHash && l.installationHash !== hash) || (l.resource && l.resource !== input.resource))
             return deny('server_mismatch');
         const first = !l.activatedAt;
         if (!(0, crypto_1.isPlan)(l.plan))

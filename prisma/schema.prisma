@@ -28,9 +28,61 @@ model ScriptLicense {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   events         ScriptLicenseEvent[]
+  // Null on every pre-existing license; no backfill or change of binding.
+  environment    String?
+  issuanceId     String?
+  issuance       ScriptLicenseIssuance? @relation(fields: [issuanceId], references: [id], onDelete: Restrict)
+  downloads      ScriptDownload[]
 
+  @@unique([issuanceId, environment])
   @@index([guildId, ownerId, createdAt])
   @@index([state, expiresAt])
+}
+
+model ScriptLicenseIssuance {
+  id        String @id @default(cuid())
+  guildId   String
+  ownerId   String
+  product   String
+  createdAt DateTime @default(now())
+  licenses  ScriptLicense[]
+
+  @@unique([guildId, ownerId, product])
+}
+
+// Immutable archive, stored durably alongside licenses, never a temporary CDN URL.
+model ScriptRelease {
+  id          String @id @default(cuid())
+  guildId     String
+  product     String
+  resource    String
+  version     String
+  sha256      String
+  archive     Bytes
+  fileCount   Int
+  status      String @default("DRAFT")
+  createdById String
+  publishedById String?
+  withdrawnById String?
+  createdAt   DateTime @default(now())
+  publishedAt DateTime?
+  withdrawnAt DateTime?
+  downloads   ScriptDownload[]
+
+  @@unique([guildId, product, resource, version])
+  @@index([guildId, product, status, publishedAt])
+}
+
+model ScriptDownload {
+  id        String @id @default(cuid())
+  licenseId String
+  releaseId String
+  ownerId   String
+  createdAt DateTime @default(now())
+  license   ScriptLicense @relation(fields: [licenseId], references: [id], onDelete: Restrict)
+  release   ScriptRelease @relation(fields: [releaseId], references: [id], onDelete: Restrict)
+
+  @@index([licenseId, createdAt])
 }
 
 model ScriptLicenseEvent {

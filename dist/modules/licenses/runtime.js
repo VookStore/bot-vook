@@ -7,6 +7,8 @@ exports.startLicenseRuntime = startLicenseRuntime;
 exports.stopLicenseRuntime = stopLicenseRuntime;
 const node_http_1 = require("node:http");
 const node_crypto_1 = require("node:crypto");
+const promises_1 = require("node:fs/promises");
+const node_path_1 = require("node:path");
 const discord_js_1 = require("discord.js");
 const prisma_1 = require("../../core/database/prisma");
 const reply_1 = require("../../components/reply");
@@ -16,6 +18,9 @@ const service_1 = require("./service");
 const crypto_1 = require("./crypto");
 const panel_1 = require("./panel");
 const commands_1 = require("./commands");
+const downloadLinks_1 = require("./downloadLinks");
+const releases_1 = require("./releases");
+const scriptProducts_1 = require("../catalog/scriptProducts");
 const logger = (0, Logger_1.createLogger)('licenses');
 let server;
 let timer;
@@ -29,8 +34,44 @@ function createLicenseServer(validate = service_1.validateLicense) {
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('Content-Type', 'application/json');
         const reply = (status, body) => { res.writeHead(status); res.end(JSON.stringify(body)); };
+        const media = /^\/catalog-assets\/([a-z0-9_-]+\.png)$/.exec(req.url || '');
+        if (req.method === 'GET' && media && Object.values(scriptProducts_1.SCRIPT_IMAGES).flat().includes(media[1])) {
+            try {
+                const image = await (0, promises_1.readFile)((0, node_path_1.join)(process.cwd(), 'assets', 'catalog', media[1]));
+                res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': image.length,
+                    'Cache-Control': 'public, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
+                res.end(image);
+            }
+            catch {
+                reply(404, { error: 'asset_not_found' });
+            }
+            return;
+        }
+        if (req.method === 'GET' && /^\/v1\/downloads\/[a-f\d]{64}$/.test(req.url || '')) {
+            res.setHeader('Referrer-Policy', 'no-referrer');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setTimeout(120000);
+            const grant = downloadLinks_1.privateDownloads.take(req.url.split('/').pop());
+            if (!grant) {
+                reply(404, { error: 'download_expired' });
+                return;
+            }
+            try {
+                await (0, releases_1.withPackageJob)(async () => {
+                    const file = await (0, releases_1.prepareDownload)(grant.licenseId, grant.releaseId, grant.ownerId, 129 * 1024 * 1024);
+                    res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': file.bytes.length,
+                        'Content-Disposition': `attachment; filename="${file.name}"` });
+                    await new Promise(resolve => { res.once('close', resolve); res.end(file.bytes, resolve); });
+                });
+            }
+            catch {
+                if (!res.headersSent)
+                    reply(503, { error: 'download_unavailable', message: 'Gere um novo link em /planos.' });
+            }
+            return;
+        }
         if (req.url === '/health' && req.method === 'GET') {
-            reply(200, { ok: true });
+            reply(200, { ok: true, catalogVersion: '2026-11-18' });
             return;
         }
         if (req.url !== '/v1/licenses/validate' || req.method !== 'POST') {

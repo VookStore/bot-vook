@@ -1,5 +1,7 @@
 import { createServer, type Server } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { Routes, type Client } from 'discord.js';
 import { getPrisma } from '../../core/database/prisma';
 import { sendV2 } from '../../components/reply';
@@ -9,6 +11,9 @@ import { validateLicense } from './service';
 import { digest } from './crypto';
 import { detailPanel } from './panel';
 import { licenseCommand, plansCommand } from './commands';
+import { privateDownloads } from './downloadLinks';
+import { prepareDownload, withPackageJob } from './releases';
+import { SCRIPT_IMAGES } from '../catalog/scriptProducts';
 const logger = createLogger('licenses');
 let server: Server | undefined;
 let timer: NodeJS.Timeout | undefined;
@@ -22,8 +27,34 @@ export function createLicenseServer(validate = validateLicense): Server {
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('Content-Type', 'application/json');
         const reply = (status: number, body: unknown) => { res.writeHead(status); res.end(JSON.stringify(body)); };
+        const media = /^\/catalog-assets\/([a-z0-9_-]+\.png)$/.exec(req.url || '');
+        if (req.method === 'GET' && media && Object.values(SCRIPT_IMAGES).flat().includes(media[1])) {
+            try {
+                const image = await readFile(join(process.cwd(), 'assets', 'catalog', media[1]));
+                res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': image.length,
+                    'Cache-Control': 'public, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
+                res.end(image);
+            } catch { reply(404, { error: 'asset_not_found' }); }
+            return;
+        }
+        if (req.method === 'GET' && /^\/v1\/downloads\/[a-f\d]{64}$/.test(req.url || '')) {
+            res.setHeader('Referrer-Policy', 'no-referrer');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setTimeout(120000);
+            const grant = privateDownloads.take(req.url!.split('/').pop()!);
+            if (!grant) { reply(404, { error: 'download_expired' }); return; }
+            try {
+                await withPackageJob(async () => {
+                    const file = await prepareDownload(grant.licenseId, grant.releaseId, grant.ownerId, 129 * 1024 * 1024);
+                    res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': file.bytes.length,
+                        'Content-Disposition': `attachment; filename="${file.name}"` });
+                    await new Promise<void>(resolve => { res.once('close', resolve); res.end(file.bytes, resolve); });
+                });
+            } catch { if (!res.headersSent) reply(503, { error: 'download_unavailable', message: 'Gere um novo link em /planos.' }); }
+            return;
+        }
         if (req.url === '/health' && req.method === 'GET') {
-            reply(200, { ok: true });
+            reply(200, { ok: true, catalogVersion: '2026-11-18' });
             return;
         }
         if (req.url !== '/v1/licenses/validate' || req.method !== 'POST') {

@@ -21,6 +21,7 @@ import { getCatalogCategories } from './CatalogCategoryService';
 import { getSellablePack } from './CatalogService';
 import { hasSellablePrice } from '../validators/packValidators';
 import type { CartLine, CartView } from '../types/catalog';
+import { isScriptPreview, SCRIPT_PREVIEW_NOTICE } from '../scriptProducts';
 
 /**
  * Carrinho do cliente.
@@ -98,6 +99,7 @@ function unavailableReason(
   enabledCategories: ReadonlySet<string>,
 ): string | null {
   if (pack.deletedAt !== null) return 'Produto removido do catalogo.';
+  if (isScriptPreview(pack)) return SCRIPT_PREVIEW_NOTICE;
   if (!pack.enabled) return 'Produto indisponivel no momento.';
   if (!enabledCategories.has(pack.categoryId)) return 'Categoria indisponivel no momento.';
   if (!hasSellablePrice(pack.price)) return 'Produto sem preco definido.';
