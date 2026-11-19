@@ -68,10 +68,10 @@ async function main(): Promise<void> {
                 await tx.catalogPackDetail.deleteMany({ where: { packId: pack.id } });
                 await tx.catalogPackDetail.createMany({ data: [...offer.details, ['Disponibilidade', 'Apresentação; compra e pagamento ainda não habilitados'], ['Licença', 'Testes/Desenvolvimento + Produção; arquivos por produto adquirido']].map(([label, value], index) => ({ packId: pack.id, label, value, position: index })) });
                 await tx.packImage.deleteMany({ where: { packId: pack.id } });
-                await tx.packImage.createMany({ data: SCRIPT_IMAGES[offer.product].map((filename, index) => ({ packId: pack.id, url: `${origin}/catalog-assets/${filename}`, altText: `${offer.name} · ${index + 1}`, position: index, isCover: index === 0 })) });
+                if (SCRIPT_IMAGES[offer.product].length) await tx.packImage.createMany({ data: SCRIPT_IMAGES[offer.product].map((filename, index) => ({ packId: pack.id, url: `${origin}/catalog-assets/${filename}`, altText: `${offer.name} · ${index + 1}`, position: index, isCover: index === 0 })) });
             }
             await tx.guildConfig.update({ where: { guildId }, data: { catalogBannerUrl: `${origin}/catalog-assets/flyer-sanrio-v2.png`, catalogDescription: 'Conheça os produtos da VOOK e as novas opções de sistemas e companheiros. Os novos sistemas e coleções estão em apresentação: compras e pagamentos ainda não estão disponíveis para essas ofertas.' } });
-        });
+        }, { timeout: 120000, maxWait: 10000 });
         const afterLicenses = await db.scriptLicense.findMany({ where: { id: { in: beforeLicenses.map(v => v.id) } }, select: { id: true, keyHash: true, keyCipher: true }, orderBy: { id: 'asc' } });
         const fingerprint = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
         if (fingerprint(beforeLicenses) !== fingerprint(afterLicenses)) throw new Error('Licenças existentes mudaram durante a publicação. Verifique a operação concorrente.');
@@ -89,4 +89,8 @@ async function main(): Promise<void> {
         console.log(JSON.stringify({ published: 4, existingLicensesPreserved: beforeLicenses.length, catalogUpdated: Boolean(current.catalogChannelId && current.catalogMessageId), paymentOperations: 0, customerMessages: 0 }));
     } finally { await db.$disconnect(); }
 }
-main().catch(() => { console.error('Publicação interrompida. Confira conectividade, versão ativa e integridade dos pacotes. Os segredos do ambiente não são exibidos.'); process.exitCode = 1; });
+main().catch((error: unknown) => {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'validation-or-connectivity';
+    console.error(`Publicação interrompida (${code}). Os pacotes já conferidos foram preservados. Os segredos do ambiente não são exibidos.`);
+    process.exitCode = 1;
+});

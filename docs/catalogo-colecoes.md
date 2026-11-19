@@ -51,6 +51,8 @@ O segundo comando faz uma validação local sem alterar o Discord nem o banco. C
 
 Use o arquivo privado do ambiente correto. Não copie segredos para o Git, imagens, mensagens, terminal ou parâmetros de linha de comando. O `LICENSE_ENCRYPTION_KEY` já configurado na hospedagem deve ser preservado: substituí-lo impediria a leitura dos códigos anteriores.
 
+Na ShardCloud, o histórico em **Configurações → Deploy** pode indicar envio concluído enquanto o processo ainda usa o código anterior. Confira a opção **Reiniciar após Deploy**. Se o reinício automático estiver desativado, use **Projeto → Reiniciar** uma vez após confirmar o commit recebido. A publicação aguarda `/health` responder com a versão nova antes de atualizar os produtos.
+
 ## Pagamentos nesta etapa
 
 O catálogo mostra **Em breve · apresentação**. Os botões de compra não aparecem no card desses produtos. As verificações no servidor recusam compra e checkout, inclusive para carrinhos antigos e preços alterados no painel administrativo. Alterar apenas o preço não habilita a venda. Uma futura ativação de pagamentos exige implementar e revisar essa etapa explicitamente.
