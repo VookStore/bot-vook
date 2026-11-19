@@ -28,7 +28,7 @@ export function isScriptPreview(pack: { sku?: string | null; slug?: string }): b
 export const SCRIPT_PREVIEW_NOTICE = 'Catálogo de apresentação. Compras e pagamentos destes produtos ainda não estão disponíveis.';
 
 export const SCRIPT_IMAGES: Record<typeof SCRIPT_CATALOG[number]['product'], readonly string[]> = {
-    pelucias_base: [],
+    pelucias_base: ['flyer-sistema-v2.png'],
     pelucias_dragoes: ['flyer-dragoes-v1.png', 'dragoes-box.png', ...['banguela', 'furiadaluz', 'tempestade', 'batatao', 'arrotaesoluca', 'alfa'].map(id => `dragao-${id}.png`)],
     companheiros_sanrio: ['flyer-sanrio-v2.png', 'sanrio-box.png', ...['kuromi', 'cinnamoroll', 'keroppi', 'hello_kitty', 'my_melody', 'badtz_maru', 'pompompurin'].map(id => `sanrio-${id}.png`)],
     // Draculaura é o destaque do flyer; as demais nove têm uma página individual.
