@@ -71,7 +71,7 @@ function createLicenseServer(validate = service_1.validateLicense) {
             return;
         }
         if (req.url === '/health' && req.method === 'GET') {
-            reply(200, { ok: true, catalogVersion: '2026-11-18', catalogLayout: 'forum-v1' });
+            reply(200, { ok: true, catalogVersion: '2026-11-18', catalogLayout: 'forum-v1', catalogPresentation: 'compact-v1' });
             return;
         }
         if (req.url !== '/v1/licenses/validate' || req.method !== 'POST') {

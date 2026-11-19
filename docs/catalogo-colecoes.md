@@ -59,7 +59,7 @@ O catálogo oficial usa o fórum `1572775765928312902`, com visualização em ga
 
 Em `/catalogo gerenciar`, escolha **Editar produto** uma única vez. O painel do produto reúne **Editar textos**, **Trocar capa**, **Artes e ordem**, **Conteúdo incluído**, **Arquivar / ocultar** e **Ver como cliente**. O formulário de texto pede somente nome, resumo e descrição; preserva o identificador e o estado de apresentação do produto. Trocar a capa substitui o link da imagem existente e mantém sua posição e marcação de capa. Toda edição exige a permissão administrativa do catálogo e confere o servidor ao qual o produto pertence.
 
-Os tópicos mostram a arte e o conteúdo incluído. **Ver outras artes** abre a galeria privada; **Meus arquivos** consulta somente as licenças de quem clicou. Não há carrinho nem checkout para as quatro ofertas de apresentação. Em servidores com outro tipo de catálogo, a navegação anterior permanece disponível.
+Os tópicos mostram a capa e um resumo curto, com a indicação discreta de catálogo de apresentação no rodapé. **Ver detalhes** abre a descrição completa e o conteúdo incluído em uma resposta privada, sem encher a publicação principal. **Ver outras artes** abre a galeria privada; **Meus arquivos** consulta somente as licenças de quem clicou. Não há carrinho nem checkout para as quatro ofertas de apresentação. Em servidores com outro tipo de catálogo, a navegação anterior permanece disponível.
 
 ## Pagamentos nesta etapa
 

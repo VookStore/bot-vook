@@ -24,14 +24,16 @@ async function syncCatalogForum(rest, guildId, forumId, botId, db = (0, prisma_1
     const threads = [];
     for (const pack of packs) {
         const cover = pack.images.find(image => image.isCover) ?? pack.images[0];
-        const description = [pack.description ?? pack.shortDescription ?? '',
+        const preview = (0, scriptProducts_1.isScriptPreview)(pack);
+        const description = preview ? (pack.shortDescription?.trim() || 'Conheça esta coleção e confira o conteúdo em Ver detalhes.') : [pack.description ?? pack.shortDescription ?? '',
             pack.details.filter(detail => !['Disponibilidade', 'Licença'].includes(detail.label)).slice(0, 6).map(detail => `**${detail.label}:** ${detail.value}`).join('\n'),
-            (0, scriptProducts_1.isScriptPreview)(pack) ? '**Apresentação da coleção · compras ainda não disponíveis.**' : '',
         ].filter(Boolean).join('\n\n');
-        const embed = new discord_js_1.EmbedBuilder().setTitle((0, sanitize_1.truncate)(pack.name, 200)).setDescription((0, sanitize_1.truncate)(description, 3800));
+        const embed = new discord_js_1.EmbedBuilder().setTitle((0, sanitize_1.truncate)(pack.name, 200)).setDescription((0, sanitize_1.truncate)(description, preview ? 240 : 3800));
+        if (preview)
+            embed.setFooter({ text: 'VOOK · Catálogo de apresentação' });
         if (cover)
             embed.setImage(cover.url);
-        const buttons = [];
+        const buttons = [new discord_js_1.ButtonBuilder().setCustomId((0, customIds_1.buildCustomId)(customIds_1.NAMESPACE.CATALOG, customIds_1.CATALOG_ACTION.PACK_INFO, pack.id)).setLabel('Ver detalhes').setStyle(discord_js_1.ButtonStyle.Secondary)];
         if (pack.images.length > 1)
             buttons.push(new discord_js_1.ButtonBuilder().setCustomId((0, customIds_1.buildCustomId)(customIds_1.NAMESPACE.CATALOG, customIds_1.CATALOG_ACTION.PACK_VIEW, pack.id, '1')).setLabel('Ver outras artes').setStyle(discord_js_1.ButtonStyle.Secondary));
         buttons.push(new discord_js_1.ButtonBuilder().setCustomId((0, customIds_1.buildCustomId)(customIds_1.NAMESPACE.LICENSE, customIds_1.LICENSE_ACTION.LIST, '0')).setLabel('Meus arquivos').setStyle(discord_js_1.ButtonStyle.Secondary));

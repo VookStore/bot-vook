@@ -24,13 +24,14 @@ export async function syncCatalogForum(rest: REST, guildId: string, forumId: str
     const threads = [];
     for (const pack of packs) {
         const cover = pack.images.find(image => image.isCover) ?? pack.images[0];
-        const description = [pack.description ?? pack.shortDescription ?? '',
+        const preview = isScriptPreview(pack);
+        const description = preview ? (pack.shortDescription?.trim() || 'Conheça esta coleção e confira o conteúdo em Ver detalhes.') : [pack.description ?? pack.shortDescription ?? '',
             pack.details.filter(detail => !['Disponibilidade', 'Licença'].includes(detail.label)).slice(0, 6).map(detail => `**${detail.label}:** ${detail.value}`).join('\n'),
-            isScriptPreview(pack) ? '**Apresentação da coleção · compras ainda não disponíveis.**' : '',
         ].filter(Boolean).join('\n\n');
-        const embed = new EmbedBuilder().setTitle(truncate(pack.name, 200)).setDescription(truncate(description, 3800));
+        const embed = new EmbedBuilder().setTitle(truncate(pack.name, 200)).setDescription(truncate(description, preview ? 240 : 3800));
+        if (preview) embed.setFooter({ text: 'VOOK · Catálogo de apresentação' });
         if (cover) embed.setImage(cover.url);
-        const buttons = [];
+        const buttons = [new ButtonBuilder().setCustomId(buildCustomId(NAMESPACE.CATALOG, CATALOG_ACTION.PACK_INFO, pack.id)).setLabel('Ver detalhes').setStyle(ButtonStyle.Secondary)];
         if (pack.images.length > 1) buttons.push(new ButtonBuilder().setCustomId(buildCustomId(NAMESPACE.CATALOG, CATALOG_ACTION.PACK_VIEW, pack.id, '1')).setLabel('Ver outras artes').setStyle(ButtonStyle.Secondary));
         buttons.push(new ButtonBuilder().setCustomId(buildCustomId(NAMESPACE.LICENSE, LICENSE_ACTION.LIST, '0')).setLabel('Meus arquivos').setStyle(ButtonStyle.Secondary));
         const title = truncate(pack.name, 100);
