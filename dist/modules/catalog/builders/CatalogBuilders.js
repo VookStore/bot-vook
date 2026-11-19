@@ -21,6 +21,7 @@ const sanitize_1 = require("../../../utils/sanitize");
 const packValidators_1 = require("../validators/packValidators");
 const scriptProducts_1 = require("../scriptProducts");
 const catalog_1 = require("../types/catalog");
+const ScriptShowcase_1 = require("./ScriptShowcase");
 /**
  * Vitrine do catalogo (Components V2).
  *
@@ -75,6 +76,8 @@ function priceLabel(pack) {
  * que carrinho e pedidos (dados do cliente) nunca virem conteudo publico.
  */
 function buildCatalogPanel(config, stats) {
+    if ((0, ScriptShowcase_1.isScriptShowcase)(stats.products))
+        return (0, ScriptShowcase_1.buildScriptShowcase)(stats.products, config.catalogBannerUrl);
     const root = (0, v2_1.container)(branding_1.COLORS.BRAND);
     (0, v2_1.addHeader)(root, config.catalogTitle, { thumbnailUrl: config.panelThumbnailUrl });
     root.addTextDisplayComponents((0, v2_1.text)(config.catalogDescription));
@@ -99,6 +102,8 @@ function buildCatalogPanel(config, stats) {
  * fica ilegivel no Discord mobile, que e onde a maioria dos clientes compra.
  */
 function buildCatalogHome(params) {
+    if ((0, ScriptShowcase_1.isScriptShowcase)(params.products))
+        return (0, ScriptShowcase_1.buildScriptShowcase)(params.products, params.bannerUrl, params.notice);
     const root = (0, v2_1.container)(branding_1.COLORS.BRAND);
     (0, v2_1.addHeader)(root, branding_1.TITLES.CATALOG, { subtitle: params.description });
     if (params.notice !== undefined && params.notice.length > 0) {
@@ -162,6 +167,8 @@ function buildCategorySelect(categories, selectedId) {
  * o teto de 4000 caracteres da mensagem V2 — que o Discord recusa com 400.
  */
 function buildCatalogList(params) {
+    if (params.totalPages === 1 && (0, ScriptShowcase_1.isScriptShowcase)(params.packs))
+        return (0, ScriptShowcase_1.buildScriptShowcase)(params.packs);
     const root = (0, v2_1.container)(branding_1.COLORS.BRAND);
     const title = params.searchTerm !== null && params.searchTerm !== undefined
         ? `${branding_1.TITLES.CATALOG} — BUSCA`
@@ -241,6 +248,8 @@ function currentImage(images, index) {
  * + 2 linhas de botoes + rodape = 8.
  */
 function buildPackCard(params) {
+    if ((0, scriptProducts_1.isScriptPreview)(params.view.pack))
+        return (0, ScriptShowcase_1.buildScriptProductCard)(params.view, params.imageIndex, params.notice);
     const { pack, images, category, details } = params.view;
     const total = images.length;
     const index = normalizeImageIndex(params.imageIndex, total);
@@ -295,6 +304,8 @@ function buildPackCard(params) {
  * O card principal fica enxuto para o mobile; o detalhe mora aqui.
  */
 function buildPackDetails(view) {
+    if ((0, scriptProducts_1.isScriptPreview)(view.pack))
+        return (0, ScriptShowcase_1.buildScriptProductDetails)(view);
     const { pack, category, details, images } = view;
     const root = (0, v2_1.container)(branding_1.COLORS.INFO);
     (0, v2_1.addHeader)(root, branding_1.TITLES.CATALOG_PACK, { subtitle: `**${pack.name}**` });

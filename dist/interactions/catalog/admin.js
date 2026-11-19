@@ -14,6 +14,10 @@ const CatalogCategoryService_1 = require("../../modules/catalog/services/Catalog
 const CatalogImageService_1 = require("../../modules/catalog/services/CatalogImageService");
 const CatalogService_1 = require("../../modules/catalog/services/CatalogService");
 const PackImageRepository_1 = require("../../modules/catalog/repositories/PackImageRepository");
+const CatalogWorkspace_1 = require("../../modules/catalog/builders/CatalogWorkspace");
+const scriptProducts_1 = require("../../modules/catalog/scriptProducts");
+const CatalogService_2 = require("../../modules/catalog/services/CatalogService");
+const CatalogImageService_2 = require("../../modules/catalog/services/CatalogImageService");
 const CatalogPanelService_1 = require("../../modules/catalog/services/CatalogPanelService");
 const GuildConfigService_1 = require("../../modules/configuration/services/GuildConfigService");
 const catalog_1 = require("../../modules/catalog/types/catalog");
@@ -45,6 +49,10 @@ async function renderAdminPanel(interaction, guildId, notice) {
         (0, CatalogCategoryService_1.getCatalogCategories)(guildId),
     ]);
     const alive = packs.filter((pack) => pack.deletedAt === null);
+    if (alive.length > 0 && alive.length <= 4 && alive.every(scriptProducts_1.isScriptPreview)) {
+        await (0, shared_1.showPanel)(interaction, (0, CatalogWorkspace_1.buildCatalogWorkspace)(alive, notice));
+        return;
+    }
     // Uma consulta agregada para TODOS os packs: contar imagem a imagem seria
     // uma consulta por produto toda vez que o painel abrisse.
     const imageCounts = await (0, PackImageRepository_1.countImagesByPack)(alive.map((pack) => pack.id));
@@ -118,6 +126,74 @@ const adminButton = {
         await renderAdminPanel(interaction, guild.id);
     },
 };
+async function renderProductWorkspace(interaction, guildId, packId, notice) {
+    const pack = await (0, CatalogService_1.requirePack)(guildId, packId);
+    await (0, shared_1.showPanel)(interaction, (0, CatalogWorkspace_1.buildProductWorkspace)(pack, await (0, CatalogImageService_1.listImages)(packId), notice));
+}
+const productPanelButton = { namespace: customIds_1.NAMESPACE.CATALOG, action: customIds_1.CATALOG_ACTION.PRODUCT_PANEL, async handle(i, parsed) {
+        const { guild, member } = (0, shared_1.requireGuildContext)(i);
+        (0, PermissionService_1.assertCanManageCatalog)(member);
+        await (0, shared_1.beginPanel)(i);
+        await renderProductWorkspace(i, guild.id, (0, customIds_1.requireArg)(parsed, 0, 'produto'));
+    } };
+const productActionButton = { namespace: customIds_1.NAMESPACE.CATALOG, action: customIds_1.CATALOG_ACTION.PRODUCT_ACTION, async handle(i, parsed) {
+        const { guild, member } = (0, shared_1.requireGuildContext)(i);
+        (0, PermissionService_1.assertCanManageCatalog)(member);
+        const kind = (0, customIds_1.requireArg)(parsed, 0, 'ação'), packId = (0, customIds_1.requireArg)(parsed, 1, 'produto');
+        if (!['text', 'cover', 'details', 'toggle'].includes(kind))
+            throw new errors_1.ValidationError('Ação desconhecida.');
+        const pack = await (0, CatalogService_1.requirePack)(guild.id, packId);
+        if (kind === 'text') {
+            await i.showModal((0, CatalogWorkspace_1.buildProductTextModal)(pack));
+            return;
+        }
+        if (kind === 'cover') {
+            await i.showModal((0, CatalogWorkspace_1.buildProductCoverModal)(pack, (0, CatalogImageService_2.resolveCover)(await (0, CatalogImageService_1.listImages)(packId))));
+            return;
+        }
+        if (kind === 'details') {
+            await i.showModal((0, CatalogAdminBuilders_1.buildPackDetailsModal)(pack, await (0, CatalogService_1.getPackDetails)(packId)));
+            return;
+        }
+        await (0, shared_1.beginPanel)(i);
+        await LockService_1.locks.withLock(LockService_1.LOCK_NAMESPACE.CATALOG_ADMIN, guild.id, () => (0, CatalogService_1.togglePack)(guild.id, member.id, packId), { userMessage: LOCK_BUSY_MESSAGE });
+        await refreshPublicCatalog(i);
+        await renderProductWorkspace(i, guild.id, packId, pack.enabled ? 'Produto arquivado / oculto.' : 'Produto republicado.');
+    } };
+const advancedButton = { namespace: customIds_1.NAMESPACE.CATALOG, action: customIds_1.CATALOG_ACTION.ADMIN_ADVANCED, async handle(i) {
+        const { guild, member } = (0, shared_1.requireGuildContext)(i);
+        (0, PermissionService_1.assertCanManageCatalog)(member);
+        await (0, shared_1.beginPanel)(i);
+        const packs = await livePacks(guild.id), categories = await (0, CatalogCategoryService_1.getCatalogCategories)(guild.id);
+        await (0, shared_1.showPanel)(i, (0, CatalogAdminBuilders_1.buildCatalogAdminPanel)({ packs: packs.length, activePacks: packs.filter(p => p.enabled).length, featured: packs.filter(p => p.featured).length, categories: categories.length, packsWithoutImage: 0, packsWithoutPrice: packs.filter(p => !(0, scriptProducts_1.isScriptPreview)(p) && !(0, packValidators_1.hasSellablePrice)(p.price)).length }));
+    } };
+const productTextModal = { namespace: customIds_1.NAMESPACE.CATALOG, action: customIds_1.CATALOG_ACTION.PRODUCT_TEXT_MODAL, async handle(i, parsed) {
+        const { guild, member } = (0, shared_1.requireGuildContext)(i);
+        (0, PermissionService_1.assertCanManageCatalog)(member);
+        const packId = (0, customIds_1.requireArg)(parsed, 0, 'produto');
+        const input = { name: (0, packValidators_1.parsePackName)(i.fields.getTextInputValue(CatalogAdminBuilders_1.PACK_FIELD.NAME)), shortDescription: (0, packValidators_1.parseShortDescription)((0, shared_1.optionalField)(i, CatalogAdminBuilders_1.PACK_FIELD.SHORT)), description: (0, packValidators_1.parseLongDescription)((0, shared_1.optionalField)(i, CatalogAdminBuilders_1.PACK_FIELD.DESCRIPTION)) };
+        await beginModal(i);
+        await LockService_1.locks.withLock(LockService_1.LOCK_NAMESPACE.CATALOG_ADMIN, guild.id, () => (0, CatalogService_2.updatePackTexts)({ guildId: guild.id, actorId: member.id, packId, ...input }), { userMessage: LOCK_BUSY_MESSAGE });
+        await refreshPublicCatalog(i);
+        await renderProductWorkspace(i, guild.id, packId, 'Textos atualizados.');
+    } };
+const productCoverModal = { namespace: customIds_1.NAMESPACE.CATALOG, action: customIds_1.CATALOG_ACTION.PRODUCT_COVER_MODAL, async handle(i, parsed) {
+        const { guild, member } = (0, shared_1.requireGuildContext)(i);
+        (0, PermissionService_1.assertCanManageCatalog)(member);
+        const packId = (0, customIds_1.requireArg)(parsed, 0, 'produto'), imageId = (0, customIds_1.requireArg)(parsed, 1, 'capa');
+        const url = (0, packValidators_1.parseImageUrl)(i.fields.getTextInputValue(CatalogAdminBuilders_1.PACK_FIELD.IMAGE_URL)), alt = (0, packValidators_1.parseImageAlt)((0, shared_1.optionalField)(i, CatalogAdminBuilders_1.PACK_FIELD.IMAGE_ALT));
+        await beginModal(i);
+        await LockService_1.locks.withLock(LockService_1.LOCK_NAMESPACE.CATALOG_ADMIN, guild.id, async () => {
+            if (imageId === 'new') {
+                const image = await (0, CatalogImageService_1.addImage)(guild.id, member.id, packId, url, alt);
+                await (0, CatalogImageService_1.changeCover)(guild.id, member.id, packId, image.id);
+            }
+            else
+                await (0, CatalogImageService_2.replaceImage)(guild.id, member.id, packId, imageId, url, alt);
+        }, { userMessage: LOCK_BUSY_MESSAGE });
+        await refreshPublicCatalog(i);
+        await renderProductWorkspace(i, guild.id, packId, 'Capa atualizada.');
+    } };
 const packNewButton = {
     namespace: customIds_1.NAMESPACE.CATALOG,
     action: customIds_1.CATALOG_ACTION.PACK_NEW,
@@ -477,6 +553,11 @@ const packDetailsModal = {
         const details = (0, packValidators_1.parsePackDetails)((0, shared_1.optionalField)(interaction, CatalogAdminBuilders_1.PACK_FIELD.DETAILS));
         await beginModal(interaction);
         await LockService_1.locks.withLock(LockService_1.LOCK_NAMESPACE.CATALOG_ADMIN, guild.id, () => (0, CatalogService_1.replaceDetails)(guild.id, member.id, packId, details), { userMessage: LOCK_BUSY_MESSAGE });
+        await refreshPublicCatalog(interaction);
+        if ((0, scriptProducts_1.isScriptPreview)(await (0, CatalogService_1.requirePack)(guild.id, packId))) {
+            await renderProductWorkspace(interaction, guild.id, packId, 'Conteúdo incluído atualizado.');
+            return;
+        }
         await renderAdminPanel(interaction, guild.id, `${branding_1.EMOJIS.APPROVE} Ficha tecnica atualizada com ${details.length} item(ns).`);
     },
 };
@@ -559,6 +640,9 @@ async function renderAdminPanelForCommand(interaction, guildId) {
     await renderAdminPanel(interaction, guildId);
 }
 exports.catalogAdminButtons = [
+    productPanelButton,
+    productActionButton,
+    advancedButton,
     adminButton,
     packNewButton,
     packPickButton,
@@ -579,6 +663,8 @@ exports.catalogAdminSelects = [
     orderChannelSelect,
 ];
 exports.catalogAdminModals = [
+    productTextModal,
+    productCoverModal,
     packNewModal,
     packEditModal,
     packPriceModal,

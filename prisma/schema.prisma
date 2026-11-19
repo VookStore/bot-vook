@@ -905,12 +905,30 @@ model CatalogPack {
   details    CatalogPackDetail[]
   cartItems  CartItem[]
   orderItems OrderItem[]
+  forumPosts CatalogForumPost[]
 
   @@unique([guildId, slug])
   @@unique([guildId, sku])
   @@index([guildId, enabled, featured, position])
   @@index([guildId, categoryId, enabled, position])
   @@map("catalog_packs")
+}
+
+model CatalogForumPost {
+  id          String   @id @default(cuid())
+  guildId     String
+  packId      String
+  forumId     String
+  threadId    String   @unique
+  messageId   String
+  contentHash String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  pack        CatalogPack @relation(fields: [packId], references: [id], onDelete: Restrict)
+
+  @@unique([guildId, packId])
+  @@index([guildId, forumId])
+  @@map("catalog_forum_posts")
 }
 
 /// Ficha tecnica do pack (compatibilidade, quantidade, formato...).

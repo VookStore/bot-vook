@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.listImages = listImages;
 exports.resolveCover = resolveCover;
 exports.addImage = addImage;
+exports.replaceImage = replaceImage;
 exports.removeImage = removeImage;
 exports.moveImage = moveImage;
 exports.changeCover = changeCover;
@@ -77,6 +78,15 @@ async function requireImage(packId, imageId) {
             context: { entityType: 'pack', entityId: packId },
         });
     }
+    return image;
+}
+/** Troca o arquivo sem recriar a imagem nem perder capa e ordem. */
+async function replaceImage(guildId, actorId, packId, imageId, url, altText) {
+    await (0, CatalogService_1.requirePack)(guildId, packId);
+    const previous = await requireImage(packId, imageId);
+    const image = await (0, PackImageRepository_1.updatePackImageContent)(imageId, { url, altText });
+    (0, CatalogService_1.invalidatePackImages)(packId);
+    await (0, CatalogAuditRepository_1.recordCatalogAudit)({ guildId, actorId, packId, imageId, action: client_1.CatalogAuditAction.PACK_UPDATED, oldValue: previous.url, newValue: url });
     return image;
 }
 /**

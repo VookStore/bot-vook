@@ -83,6 +83,8 @@ async function renderHome(
       categories,
       featured,
       totalPacks: visible.length,
+      products: visible,
+      bannerUrl: config.catalogBannerUrl,
       ...(notice !== undefined ? { notice } : {}),
     }),
   );
@@ -495,6 +497,8 @@ export async function renderHomeForCommand(
       categories,
       featured,
       totalPacks: visible.length,
+      products: visible,
+      bannerUrl: config.catalogBannerUrl,
     }),
   );
 }

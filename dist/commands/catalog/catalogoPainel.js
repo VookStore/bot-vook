@@ -29,7 +29,7 @@ const builder = new discord_js_1.SlashCommandBuilder()
     .addChannelOption((option) => option
     .setName('canal')
     .setDescription('Canal onde o painel sera publicado (padrao: canal atual)')
-    .addChannelTypes(discord_js_1.ChannelType.GuildText)
+    .addChannelTypes(discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildForum)
     .setRequired(false)))
     .addSubcommand((subcommand) => subcommand
     .setName('atualizar')
@@ -82,6 +82,11 @@ async function execute(interaction) {
     }
     if (subcommand === 'enviar') {
         const target = interaction.options.getChannel('canal') ?? interaction.channel;
+        if (target?.type === discord_js_1.ChannelType.GuildForum) {
+            await (0, CatalogPanelService_1.publishCatalogForum)(interaction.guild, target.id);
+            await (0, reply_1.replySuccess)(interaction, `Catálogo organizado em tópicos no fórum <#${target.id}>.`);
+            return;
+        }
         if (!(0, discord_1.isSendableTextChannel)(target)) {
             throw new errors_1.ValidationError('Canal invalido para o painel do catalogo.', {
                 userMessage: 'Escolha um canal de texto onde o bot possa enviar mensagens.',

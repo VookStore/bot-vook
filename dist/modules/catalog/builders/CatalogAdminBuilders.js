@@ -25,6 +25,8 @@ const errors_1 = require("../../../core/errors");
 const money_1 = require("../../../utils/money");
 const sanitize_1 = require("../../../utils/sanitize");
 const packValidators_1 = require("../validators/packValidators");
+const scriptProducts_1 = require("../scriptProducts");
+const CatalogWorkspace_1 = require("./CatalogWorkspace");
 const catalog_1 = require("../types/catalog");
 /**
  * Administracao do catalogo (Components V2).
@@ -257,6 +259,8 @@ function buildCategoryChooserPanel(params) {
 // ---------------------------------------------------------------------------
 /** Formulario comercial do pack (5 campos — o maximo permitido). */
 function buildPackModal(mode, params) {
+    if (mode === 'edit' && params.pack && (0, scriptProducts_1.isScriptPreview)(params.pack))
+        return (0, CatalogWorkspace_1.buildProductTextModal)(params.pack);
     if (mode === 'edit' && params.pack === undefined) {
         throw new errors_1.ValidationError('Modal de edicao exige o pack carregado.', {
             userMessage: 'Nao foi possivel abrir este pack. Atualize o painel e tente novamente.',
@@ -372,7 +376,7 @@ function buildPackImagesPanel(pack, images, options = {}) {
     root.addSeparatorComponents((0, v2_1.separator)());
     root.addActionRowComponents((0, v2_1.buttonRow)(adminButton(customIds_1.CATALOG_ACTION.IMAGE_ADD, branding_1.EMOJIS.ADD, 'Adicionar Imagem', pack.id).setDisabled(images.length >= limits_1.BUSINESS_LIMITS.MAX_IMAGES_PER_PACK), adminButton(customIds_1.CATALOG_ACTION.IMAGE_PICK, branding_1.EMOJIS.DELETE, 'Remover', catalog_1.IMAGE_PICK_KIND.REMOVE, pack.id).setDisabled(images.length === 0), adminButton(customIds_1.CATALOG_ACTION.IMAGE_PICK, branding_1.EMOJIS.UP, 'Mover Cima', catalog_1.IMAGE_PICK_KIND.UP, pack.id)
         .setDisabled(images.length < 2), adminButton(customIds_1.CATALOG_ACTION.IMAGE_PICK, branding_1.EMOJIS.DOWN, 'Mover Baixo', catalog_1.IMAGE_PICK_KIND.DOWN, pack.id).setDisabled(images.length < 2), adminButton(customIds_1.CATALOG_ACTION.IMAGE_PICK, branding_1.EMOJIS.FEATURED, 'Definir Capa', catalog_1.IMAGE_PICK_KIND.COVER, pack.id).setDisabled(images.length === 0)));
-    root.addActionRowComponents((0, v2_1.buttonRow)(adminButton(customIds_1.CATALOG_ACTION.PACK_PICK, branding_1.EMOJIS.IMAGE, 'Outro Pack', catalog_1.PACK_PICK_KIND.IMAGES, '1'), adminBackButton()));
+    root.addActionRowComponents((0, v2_1.buttonRow)(adminButton(customIds_1.CATALOG_ACTION.PACK_PICK, branding_1.EMOJIS.IMAGE, 'Outro Pack', catalog_1.PACK_PICK_KIND.IMAGES, '1'), (0, scriptProducts_1.isScriptPreview)(pack) ? adminButton(customIds_1.CATALOG_ACTION.PRODUCT_PANEL, branding_1.EMOJIS.BACK, 'Voltar ao produto', pack.id) : adminBackButton(), ...((0, scriptProducts_1.isScriptPreview)(pack) ? [adminButton(customIds_1.CATALOG_ACTION.PRODUCT_ACTION, branding_1.EMOJIS.EDIT, 'Trocar capa', 'cover', pack.id)] : [])));
     root.addTextDisplayComponents((0, v2_1.footerNote)(`A ordem define a navegacao ◀️ ▶️ do cliente. Maximo de ${limits_1.BUSINESS_LIMITS.MAX_IMAGES_PER_PACK} imagens por pack.`));
     return root;
 }

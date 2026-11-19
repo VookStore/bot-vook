@@ -42,9 +42,9 @@ it.each(SCRIPT_CATALOG)('$name bloqueia compra mesmo com preço positivo, por SK
     expect(isScriptPreview({ ...value, slug: 'outro-nome' })).toBe(true);
     const view = { pack: value, category: null as CatalogCategory | null, images: [], details: [] };
     const card = JSON.stringify(buildPackCard({ view, imageIndex: 0 }).toJSON());
-    expect(card).toContain('apresentação');
+    expect(card).toContain('Compras ainda não disponíveis');
     expect(card).not.toMatch(/Comprar Agora|Adicionar ao Carrinho/);
-    expect(JSON.stringify(buildPackDetails(view).toJSON())).toContain('"disabled":true');
+    expect(JSON.stringify(buildPackDetails(view).toJSON())).not.toMatch(/Comprar Agora|Adicionar ao Carrinho/);
 });
 it('carrinho antigo ou forjado não transforma apresentação em cobrança', async () => {
     const value = pack();

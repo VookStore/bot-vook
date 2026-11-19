@@ -67,6 +67,10 @@ import {
   updatePackFromInput,
 } from '../../modules/catalog/services/CatalogService';
 import { countImagesByPack } from '../../modules/catalog/repositories/PackImageRepository';
+import { buildCatalogWorkspace, buildProductWorkspace, buildProductTextModal, buildProductCoverModal } from '../../modules/catalog/builders/CatalogWorkspace';
+import { isScriptPreview } from '../../modules/catalog/scriptProducts';
+import { updatePackTexts } from '../../modules/catalog/services/CatalogService';
+import { replaceImage, resolveCover } from '../../modules/catalog/services/CatalogImageService';
 import { refreshCatalogPanel } from '../../modules/catalog/services/CatalogPanelService';
 import {
   getGuildConfig,
@@ -146,6 +150,10 @@ async function renderAdminPanel(
   ]);
 
   const alive = packs.filter((pack) => pack.deletedAt === null);
+  if (alive.length > 0 && alive.length <= 4 && alive.every(isScriptPreview)) {
+    await showPanel(interaction, buildCatalogWorkspace(alive, notice));
+    return;
+  }
 
   // Uma consulta agregada para TODOS os packs: contar imagem a imagem seria
   // uma consulta por produto toda vez que o painel abrisse.
@@ -260,6 +268,55 @@ const adminButton: ButtonHandler = {
     await renderAdminPanel(interaction, guild.id);
   },
 };
+
+async function renderProductWorkspace(interaction: RepliableInteraction, guildId: string, packId: string, notice?: string): Promise<void> {
+  const pack = await requirePack(guildId, packId);
+  await showPanel(interaction, buildProductWorkspace(pack, await listImages(packId), notice));
+}
+const productPanelButton: ButtonHandler = { namespace: NAMESPACE.CATALOG, action: CATALOG_ACTION.PRODUCT_PANEL, async handle(i, parsed) {
+  const { guild, member } = requireGuildContext(i); assertCanManageCatalog(member);
+  await beginPanel(i); await renderProductWorkspace(i, guild.id, requireArg(parsed, 0, 'produto'));
+} };
+const productActionButton: ButtonHandler = { namespace: NAMESPACE.CATALOG, action: CATALOG_ACTION.PRODUCT_ACTION, async handle(i, parsed) {
+  const { guild, member } = requireGuildContext(i); assertCanManageCatalog(member);
+  const kind = requireArg(parsed, 0, 'ação'), packId = requireArg(parsed, 1, 'produto');
+  if (!['text', 'cover', 'details', 'toggle'].includes(kind)) throw new ValidationError('Ação desconhecida.');
+  const pack = await requirePack(guild.id, packId);
+  if (kind === 'text') { await i.showModal(buildProductTextModal(pack)); return; }
+  if (kind === 'cover') { await i.showModal(buildProductCoverModal(pack, resolveCover(await listImages(packId)))); return; }
+  if (kind === 'details') { await i.showModal(buildPackDetailsModal(pack, await getPackDetails(packId))); return; }
+  await beginPanel(i);
+  await locks.withLock(LOCK_NAMESPACE.CATALOG_ADMIN, guild.id, () => togglePack(guild.id, member.id, packId), { userMessage: LOCK_BUSY_MESSAGE });
+  await refreshPublicCatalog(i);
+  await renderProductWorkspace(i, guild.id, packId, pack.enabled ? 'Produto arquivado / oculto.' : 'Produto republicado.');
+} };
+const advancedButton: ButtonHandler = { namespace: NAMESPACE.CATALOG, action: CATALOG_ACTION.ADMIN_ADVANCED, async handle(i) {
+  const { guild, member } = requireGuildContext(i); assertCanManageCatalog(member); await beginPanel(i);
+  const packs = await livePacks(guild.id), categories = await getCatalogCategories(guild.id);
+  await showPanel(i, buildCatalogAdminPanel({ packs: packs.length, activePacks: packs.filter(p => p.enabled).length, featured: packs.filter(p => p.featured).length, categories: categories.length, packsWithoutImage: 0, packsWithoutPrice: packs.filter(p => !isScriptPreview(p) && !hasSellablePrice(p.price)).length }));
+} };
+const productTextModal: ModalHandler = { namespace: NAMESPACE.CATALOG, action: CATALOG_ACTION.PRODUCT_TEXT_MODAL, async handle(i, parsed) {
+  const { guild, member } = requireGuildContext(i); assertCanManageCatalog(member);
+  const packId = requireArg(parsed, 0, 'produto');
+  const input = { name: parsePackName(i.fields.getTextInputValue(PACK_FIELD.NAME)), shortDescription: parseShortDescription(optionalField(i, PACK_FIELD.SHORT)), description: parseLongDescription(optionalField(i, PACK_FIELD.DESCRIPTION)) };
+  await beginModal(i);
+  await locks.withLock(LOCK_NAMESPACE.CATALOG_ADMIN, guild.id, () => updatePackTexts({ guildId: guild.id, actorId: member.id, packId, ...input }), { userMessage: LOCK_BUSY_MESSAGE });
+  await refreshPublicCatalog(i); await renderProductWorkspace(i, guild.id, packId, 'Textos atualizados.');
+} };
+const productCoverModal: ModalHandler = { namespace: NAMESPACE.CATALOG, action: CATALOG_ACTION.PRODUCT_COVER_MODAL, async handle(i, parsed) {
+  const { guild, member } = requireGuildContext(i); assertCanManageCatalog(member);
+  const packId = requireArg(parsed, 0, 'produto'), imageId = requireArg(parsed, 1, 'capa');
+  const url = parseImageUrl(i.fields.getTextInputValue(PACK_FIELD.IMAGE_URL)), alt = parseImageAlt(optionalField(i, PACK_FIELD.IMAGE_ALT));
+  await beginModal(i);
+  await locks.withLock(LOCK_NAMESPACE.CATALOG_ADMIN, guild.id, async () => {
+    if (imageId === 'new') {
+      const image = await addImage(guild.id, member.id, packId, url, alt);
+      await changeCover(guild.id, member.id, packId, image.id);
+    }
+    else await replaceImage(guild.id, member.id, packId, imageId, url, alt);
+  }, { userMessage: LOCK_BUSY_MESSAGE });
+  await refreshPublicCatalog(i); await renderProductWorkspace(i, guild.id, packId, 'Capa atualizada.');
+} };
 
 const packNewButton: ButtonHandler = {
   namespace: NAMESPACE.CATALOG,
@@ -765,6 +822,11 @@ const packDetailsModal: ModalHandler = {
       { userMessage: LOCK_BUSY_MESSAGE },
     );
 
+    await refreshPublicCatalog(interaction);
+    if (isScriptPreview(await requirePack(guild.id, packId))) {
+      await renderProductWorkspace(interaction, guild.id, packId, 'Conteúdo incluído atualizado.');
+      return;
+    }
     await renderAdminPanel(
       interaction,
       guild.id,
@@ -910,6 +972,9 @@ export async function renderAdminPanelForCommand(
 }
 
 export const catalogAdminButtons: ButtonHandler[] = [
+  productPanelButton,
+  productActionButton,
+  advancedButton,
   adminButton,
   packNewButton,
   packPickButton,
@@ -932,6 +997,8 @@ export const catalogAdminSelects: SelectHandler[] = [
 ];
 
 export const catalogAdminModals: ModalHandler[] = [
+  productTextModal,
+  productCoverModal,
   packNewModal,
   packEditModal,
   packPriceModal,

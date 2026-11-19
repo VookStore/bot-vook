@@ -26,6 +26,7 @@ import { truncate } from '../../../utils/sanitize';
 import { hasSellablePrice } from '../validators/packValidators';
 import { isScriptPreview, SCRIPT_PREVIEW_NOTICE } from '../scriptProducts';
 import { ALL_CATEGORIES_VALUE, type PackView } from '../types/catalog';
+import { buildScriptShowcase, buildScriptProductCard, buildScriptProductDetails, isScriptShowcase } from './ScriptShowcase';
 
 /**
  * Vitrine do catalogo (Components V2).
@@ -94,8 +95,9 @@ function priceLabel(pack: CatalogPack): string {
  */
 export function buildCatalogPanel(
   config: GuildConfig,
-  stats: { packs: number; categories: number },
+  stats: { packs: number; categories: number; products?: readonly CatalogPack[] },
 ): ContainerBuilder {
+  if (isScriptShowcase(stats.products)) return buildScriptShowcase(stats.products, config.catalogBannerUrl);
   const root = container(COLORS.BRAND);
   addHeader(root, config.catalogTitle, { thumbnailUrl: config.panelThumbnailUrl });
 
@@ -138,6 +140,8 @@ export interface CatalogHomeParams {
   categories: ReadonlyArray<{ category: CatalogCategory; count: number }>;
   featured: readonly CatalogPack[];
   totalPacks: number;
+  products?: readonly CatalogPack[];
+  bannerUrl?: string | null;
   notice?: string;
 }
 
@@ -148,6 +152,7 @@ export interface CatalogHomeParams {
  * fica ilegivel no Discord mobile, que e onde a maioria dos clientes compra.
  */
 export function buildCatalogHome(params: CatalogHomeParams): ContainerBuilder {
+  if (isScriptShowcase(params.products)) return buildScriptShowcase(params.products, params.bannerUrl, params.notice);
   const root = container(COLORS.BRAND);
   addHeader(root, TITLES.CATALOG, { subtitle: params.description });
 
@@ -265,6 +270,7 @@ export interface CatalogListParams {
  * o teto de 4000 caracteres da mensagem V2 — que o Discord recusa com 400.
  */
 export function buildCatalogList(params: CatalogListParams): ContainerBuilder {
+  if (params.totalPages === 1 && isScriptShowcase(params.packs)) return buildScriptShowcase(params.packs);
   const root = container(COLORS.BRAND);
 
   const title =
@@ -408,6 +414,7 @@ function currentImage(images: readonly PackImage[], index: number): PackImage | 
  * + 2 linhas de botoes + rodape = 8.
  */
 export function buildPackCard(params: PackCardParams): ContainerBuilder {
+  if (isScriptPreview(params.view.pack)) return buildScriptProductCard(params.view, params.imageIndex, params.notice);
   const { pack, images, category, details } = params.view;
   const total = images.length;
   const index = normalizeImageIndex(params.imageIndex, total);
@@ -497,6 +504,7 @@ export function buildPackCard(params: PackCardParams): ContainerBuilder {
  * O card principal fica enxuto para o mobile; o detalhe mora aqui.
  */
 export function buildPackDetails(view: PackView): ContainerBuilder {
+  if (isScriptPreview(view.pack)) return buildScriptProductDetails(view);
   const { pack, category, details, images } = view;
 
   const root = container(COLORS.INFO);

@@ -53,6 +53,14 @@ Use o arquivo privado do ambiente correto. Não copie segredos para o Git, image
 
 Na ShardCloud, o histórico em **Configurações → Deploy** pode indicar envio concluído enquanto o processo ainda usa o código anterior. Confira a opção **Reiniciar após Deploy**. Se o reinício automático estiver desativado, use **Projeto → Reiniciar** uma vez após confirmar o commit recebido. A publicação aguarda `/health` responder com a versão nova antes de atualizar os produtos.
 
+## Fórum e edição simplificada
+
+O catálogo oficial usa o fórum `1572775765928312902`, com visualização em galeria e as etiquetas **Coleções** e **Sistemas**. Há um tópico por produto. `/catalogo-painel enviar canal:<fórum>` vincula outro fórum do mesmo servidor; `/catalogo-painel atualizar` sincroniza os tópicos já vinculados. Atualizar título, descrição, conteúdo ou capa edita a publicação inicial sem apagar respostas ou criar outro tópico. Produtos ocultos têm o tópico arquivado. As permissões do canal continuam sendo as configuradas pela equipe no Discord.
+
+Em `/catalogo gerenciar`, escolha **Editar produto** uma única vez. O painel do produto reúne **Editar textos**, **Trocar capa**, **Artes e ordem**, **Conteúdo incluído**, **Arquivar / ocultar** e **Ver como cliente**. O formulário de texto pede somente nome, resumo e descrição; preserva o identificador e o estado de apresentação do produto. Trocar a capa substitui o link da imagem existente e mantém sua posição e marcação de capa. Toda edição exige a permissão administrativa do catálogo e confere o servidor ao qual o produto pertence.
+
+Os tópicos mostram a arte e o conteúdo incluído. **Ver outras artes** abre a galeria privada; **Meus arquivos** consulta somente as licenças de quem clicou. Não há carrinho nem checkout para as quatro ofertas de apresentação. Em servidores com outro tipo de catálogo, a navegação anterior permanece disponível.
+
 ## Pagamentos nesta etapa
 
 O catálogo mostra **Em breve · apresentação**. Os botões de compra não aparecem no card desses produtos. As verificações no servidor recusam compra e checkout, inclusive para carrinhos antigos e preços alterados no painel administrativo. Alterar apenas o preço não habilita a venda. Uma futura ativação de pagamentos exige implementar e revisar essa etapa explicitamente.

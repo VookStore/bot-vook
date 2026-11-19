@@ -48,6 +48,8 @@ async function renderHome(interaction, guildId, notice) {
         categories,
         featured,
         totalPacks: visible.length,
+        products: visible,
+        bannerUrl: config.catalogBannerUrl,
         ...(notice !== undefined ? { notice } : {}),
     }));
 }
@@ -353,6 +355,8 @@ async function renderHomeForCommand(interaction, guildId) {
         categories,
         featured,
         totalPacks: visible.length,
+        products: visible,
+        bannerUrl: config.catalogBannerUrl,
     }));
 }
 exports.catalogCustomerButtons = [

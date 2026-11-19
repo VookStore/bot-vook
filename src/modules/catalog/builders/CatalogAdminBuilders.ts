@@ -32,6 +32,8 @@ import { ValidationError } from '../../../core/errors';
 import { formatCents } from '../../../utils/money';
 import { truncate } from '../../../utils/sanitize';
 import { formatPackDetails } from '../validators/packValidators';
+import { isScriptPreview } from '../scriptProducts';
+import { buildProductTextModal } from './CatalogWorkspace';
 import {
   CATEGORY_PICK_KIND,
   IMAGE_PICK_KIND,
@@ -430,6 +432,7 @@ export function buildPackModal(
   mode: 'create' | 'edit',
   params: { categoryId?: string; pack?: CatalogPack },
 ): ModalBuilder {
+  if (mode === 'edit' && params.pack && isScriptPreview(params.pack)) return buildProductTextModal(params.pack);
   if (mode === 'edit' && params.pack === undefined) {
     throw new ValidationError('Modal de edicao exige o pack carregado.', {
       userMessage: 'Nao foi possivel abrir este pack. Atualize o painel e tente novamente.',
@@ -624,7 +627,8 @@ export function buildPackImagesPanel(
   root.addActionRowComponents(
     buttonRow(
       adminButton(CATALOG_ACTION.PACK_PICK, EMOJIS.IMAGE, 'Outro Pack', PACK_PICK_KIND.IMAGES, '1'),
-      adminBackButton(),
+      isScriptPreview(pack) ? adminButton(CATALOG_ACTION.PRODUCT_PANEL, EMOJIS.BACK, 'Voltar ao produto', pack.id) : adminBackButton(),
+      ...(isScriptPreview(pack) ? [adminButton(CATALOG_ACTION.PRODUCT_ACTION, EMOJIS.EDIT, 'Trocar capa', 'cover', pack.id)] : []),
     ),
   );
 

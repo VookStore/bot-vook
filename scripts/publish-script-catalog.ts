@@ -8,6 +8,7 @@ import { SCRIPT_CATALOG, SCRIPT_IMAGES } from '../src/modules/catalog/scriptProd
 import { archiveHash, inspectPackage, releaseEndpoint } from '../src/modules/licenses/packages';
 import { buildCatalogPanel } from '../src/modules/catalog/builders/CatalogBuilders';
 import { licenseCommand, plansCommand } from '../src/modules/licenses/commands';
+import { syncCatalogForum } from '../src/modules/catalog/services/CatalogForumService';
 
 /** Publicação manual e idempotente. Não cria pedidos, pagamentos, concessões nem DMs. */
 async function main(): Promise<void> {
@@ -80,8 +81,10 @@ async function main(): Promise<void> {
             db.catalogPack.count({ where: { guildId, enabled: true, deletedAt: null, category: { enabled: true, deletedAt: null } } }),
             db.catalogCategory.count({ where: { guildId, enabled: true, deletedAt: null } }),
         ]);
+        const products = await db.catalogPack.findMany({ where: { guildId, enabled: true, deletedAt: null, category: { enabled: true, deletedAt: null } } });
+        if (current.catalogChannelId && !current.catalogMessageId) await syncCatalogForum(rest, guildId, current.catalogChannelId, environment.DISCORD_CLIENT_ID, db);
         if (current.catalogChannelId && current.catalogMessageId) await rest.patch(Routes.channelMessage(current.catalogChannelId, current.catalogMessageId), {
-            body: { components: [buildCatalogPanel(current, { packs, categories }).toJSON()], flags: MessageFlags.IsComponentsV2, allowed_mentions: { parse: [] } },
+            body: { components: [buildCatalogPanel(current, { packs, categories, products }).toJSON()], flags: MessageFlags.IsComponentsV2, allowed_mentions: { parse: [] } },
         });
         if (!environment.DISCORD_CLIENT_ID) throw new Error('DISCORD_CLIENT_ID ausente para atualizar os comandos.');
         await rest.post(Routes.applicationCommands(environment.DISCORD_CLIENT_ID), { body: plansCommand.builder.toJSON() });

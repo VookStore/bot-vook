@@ -13,6 +13,7 @@ import {
   listPackImages,
   renumberPackImages,
   setPackCover,
+  updatePackImageContent,
 } from '../repositories/PackImageRepository';
 import { getPackImages, invalidatePackImages, requirePack } from './CatalogService';
 
@@ -96,6 +97,16 @@ async function requireImage(packId: string, imageId: string): Promise<PackImage>
       context: { entityType: 'pack', entityId: packId },
     });
   }
+  return image;
+}
+
+/** Troca o arquivo sem recriar a imagem nem perder capa e ordem. */
+export async function replaceImage(guildId: string, actorId: string, packId: string, imageId: string, url: string, altText: string | null): Promise<PackImage> {
+  await requirePack(guildId, packId);
+  const previous = await requireImage(packId, imageId);
+  const image = await updatePackImageContent(imageId, { url, altText });
+  invalidatePackImages(packId);
+  await recordCatalogAudit({ guildId, actorId, packId, imageId, action: CatalogAuditAction.PACK_UPDATED, oldValue: previous.url, newValue: url });
   return image;
 }
 

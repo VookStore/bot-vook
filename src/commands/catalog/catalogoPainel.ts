@@ -19,6 +19,7 @@ import { truncate } from '../../utils/sanitize';
 import { isSendableTextChannel } from '../../utils/discord';
 import {
   publishCatalogPanel,
+  publishCatalogForum,
   refreshCatalogPanel,
   removeCatalogPanel,
 } from '../../modules/catalog/services/CatalogPanelService';
@@ -51,7 +52,7 @@ const builder = new SlashCommandBuilder()
         option
           .setName('canal')
           .setDescription('Canal onde o painel sera publicado (padrao: canal atual)')
-          .addChannelTypes(ChannelType.GuildText)
+          .addChannelTypes(ChannelType.GuildText, ChannelType.GuildForum)
           .setRequired(false),
       ),
   )
@@ -134,6 +135,11 @@ async function execute(interaction: GuildChatInputInteraction): Promise<void> {
 
   if (subcommand === 'enviar') {
     const target = interaction.options.getChannel('canal') ?? interaction.channel;
+    if (target?.type === ChannelType.GuildForum) {
+      await publishCatalogForum(interaction.guild, target.id);
+      await replySuccess(interaction, `Catálogo organizado em tópicos no fórum <#${target.id}>.`);
+      return;
+    }
     if (!isSendableTextChannel(target)) {
       throw new ValidationError('Canal invalido para o painel do catalogo.', {
         userMessage: 'Escolha um canal de texto onde o bot possa enviar mensagens.',

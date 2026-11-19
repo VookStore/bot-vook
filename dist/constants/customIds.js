@@ -234,6 +234,11 @@ exports.CATALOG_ACTION = {
     // --- Administracao ---
     ADMIN: 'admin',
     PACK_NEW: 'p-new',
+    PRODUCT_PANEL: 'product-panel',
+    PRODUCT_ACTION: 'product-action',
+    PRODUCT_TEXT_MODAL: 'product-text',
+    PRODUCT_COVER_MODAL: 'product-cover',
+    ADMIN_ADVANCED: 'admin-advanced',
     PACK_NEW_CATEGORY: 'p-new-cat',
     PACK_NEW_MODAL: 'p-new-modal',
     /** Abre o seletor de packs para uma acao administrativa (`kind` no arg 0). */

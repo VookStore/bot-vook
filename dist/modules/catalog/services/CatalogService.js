@@ -13,6 +13,7 @@ exports.countActivePacks = countActivePacks;
 exports.createPackFromInput = createPackFromInput;
 exports.requirePack = requirePack;
 exports.updatePackFromInput = updatePackFromInput;
+exports.updatePackTexts = updatePackTexts;
 exports.changePackPrice = changePackPrice;
 exports.changePackCategory = changePackCategory;
 exports.togglePack = togglePack;
@@ -256,10 +257,15 @@ async function requirePack(guildId, packId) {
     return pack;
 }
 async function updatePackFromInput(input) {
-    (0, packValidators_1.assertValidPrice)(input.price);
     const current = await requirePack(input.guildId, input.packId);
+    if ((0, scriptProducts_1.isScriptPreview)(current)) {
+        if (input.sku !== current.sku || input.price !== current.price)
+            throw new errors_1.ValidationError('Esta oferta está em apresentação. A identidade e o preço não podem ser alterados neste formulário.');
+    }
+    else
+        (0, packValidators_1.assertValidPrice)(input.price);
     await assertSkuAvailable(input.guildId, input.sku, current.id);
-    const slug = input.name === current.name
+    const slug = input.name === current.name || (0, scriptProducts_1.isScriptPreview)(current)
         ? current.slug
         : await uniqueSlug(input.guildId, input.name, current.id);
     const updated = await (0, CatalogPackRepository_1.updatePack)(current.id, {
@@ -286,6 +292,10 @@ async function updatePackFromInput(input) {
         entityId: updated.id,
     });
     return updated;
+}
+async function updatePackTexts(input) {
+    const current = await requirePack(input.guildId, input.packId);
+    return updatePackFromInput({ ...input, sku: current.sku, price: current.price });
 }
 /** Altera somente o preco (caminho rapido do painel "Precos"). */
 async function changePackPrice(guildId, actorId, packId, price) {

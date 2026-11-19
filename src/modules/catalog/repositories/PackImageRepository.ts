@@ -82,6 +82,10 @@ export async function deletePackImage(
   return db.packImage.delete({ where: { id } });
 }
 
+export async function updatePackImageContent(id: string, data: { url: string; altText: string | null }, db: DatabaseClient = getPrisma()): Promise<PackImage> {
+  return db.packImage.update({ where: { id }, data });
+}
+
 /** Renumera as posicoes (0..n-1) na ordem recebida. */
 export async function renumberPackImages(
   orderedIds: readonly string[],

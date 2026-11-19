@@ -7,6 +7,7 @@ exports.countPackImages = countPackImages;
 exports.countImagesByPack = countImagesByPack;
 exports.createPackImage = createPackImage;
 exports.deletePackImage = deletePackImage;
+exports.updatePackImageContent = updatePackImageContent;
 exports.renumberPackImages = renumberPackImages;
 exports.setPackCover = setPackCover;
 const prisma_1 = require("../../../core/database/prisma");
@@ -61,6 +62,9 @@ async function createPackImage(input, db = (0, prisma_1.getPrisma)()) {
 }
 async function deletePackImage(id, db = (0, prisma_1.getPrisma)()) {
     return db.packImage.delete({ where: { id } });
+}
+async function updatePackImageContent(id, data, db = (0, prisma_1.getPrisma)()) {
+    return db.packImage.update({ where: { id }, data });
 }
 /** Renumera as posicoes (0..n-1) na ordem recebida. */
 async function renumberPackImages(orderedIds, db = (0, prisma_1.getPrisma)()) {

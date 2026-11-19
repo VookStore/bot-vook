@@ -54,7 +54,7 @@ export function createLicenseServer(validate = validateLicense): Server {
             return;
         }
         if (req.url === '/health' && req.method === 'GET') {
-            reply(200, { ok: true, catalogVersion: '2026-11-18' });
+            reply(200, { ok: true, catalogVersion: '2026-11-18', catalogLayout: 'forum-v1' });
             return;
         }
         if (req.url !== '/v1/licenses/validate' || req.method !== 'POST') {

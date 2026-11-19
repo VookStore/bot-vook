@@ -1,4 +1,4 @@
-import { MessageFlags } from 'discord.js';
+import { ChannelType, MessageFlags } from 'discord.js';
 import type { Guild, Message } from 'discord.js';
 
 import { sendV2 } from '../../../components/reply';
@@ -18,6 +18,7 @@ import {
 import { buildCatalogPanel } from '../builders/CatalogBuilders';
 import { getEnabledCatalogCategories } from './CatalogCategoryService';
 import { listVisiblePacks } from './CatalogService';
+import { syncCatalogForum } from './CatalogForumService';
 
 /**
  * Painel publico do catalogo.
@@ -44,7 +45,7 @@ async function buildPanel(guild: Guild): Promise<ReturnType<typeof buildCatalogP
     getEnabledCatalogCategories(guild.id),
   ]);
 
-  return buildCatalogPanel(config, { packs: packs.length, categories: categories.length });
+  return buildCatalogPanel(config, { packs: packs.length, categories: categories.length, products: packs });
 }
 
 export async function publishCatalogPanel(
@@ -73,6 +74,13 @@ export async function publishCatalogPanel(
   });
 }
 
+export async function publishCatalogForum(guild: Guild, forumId: string): Promise<void> {
+  await locks.withLock(LOCK_NAMESPACE.PANEL_UPDATE, panelKey(guild.id), async () => {
+    await syncCatalogForum(guild.client.rest, guild.id, forumId, guild.client.user.id);
+    await updateGuildConfig(guild.id, { catalogChannelId: forumId, catalogMessageId: null });
+  });
+}
+
 export interface CatalogPanelResult {
   updated: boolean;
   reason?: string;
@@ -87,11 +95,16 @@ export async function refreshCatalogPanel(guild: Guild): Promise<CatalogPanelRes
   return locks.withLock(LOCK_NAMESPACE.PANEL_UPDATE, panelKey(guild.id), async () => {
     const config = await getGuildConfig(guild.id);
 
-    if (config.catalogChannelId === null || config.catalogMessageId === null) {
+    if (config.catalogChannelId === null) {
       return { updated: false, reason: 'Nenhum painel de catalogo publicado ainda.' };
     }
 
     const channel = await fetchChannelSafe(guild, config.catalogChannelId);
+    if (channel?.type === ChannelType.GuildForum) {
+      const result = await syncCatalogForum(guild.client.rest, guild.id, channel.id, guild.client.user.id);
+      return { updated: true, reason: `${result.threads.length} tópicos sincronizados.` };
+    }
+    if (config.catalogMessageId === null) return { updated: false, reason: 'Nenhum painel publicado.' };
     if (!isSendableTextChannel(channel)) {
       return {
         updated: false,
@@ -155,7 +168,7 @@ export async function removeCatalogPanel(guild: Guild): Promise<boolean> {
  */
 export async function ensureCatalogPanelHealthy(guild: Guild): Promise<CatalogPanelResult> {
   const config = await getGuildConfig(guild.id);
-  if (config.catalogChannelId === null || config.catalogMessageId === null) {
+  if (config.catalogChannelId === null) {
     return { updated: false, reason: 'Painel do catalogo nunca foi publicado nesta guild.' };
   }
   return refreshCatalogPanel(guild);

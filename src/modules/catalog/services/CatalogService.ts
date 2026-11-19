@@ -344,13 +344,14 @@ export interface UpdatePackInput {
 }
 
 export async function updatePackFromInput(input: UpdatePackInput): Promise<CatalogPack> {
-  assertValidPrice(input.price);
-
   const current = await requirePack(input.guildId, input.packId);
+  if (isScriptPreview(current)) {
+    if (input.sku !== current.sku || input.price !== current.price) throw new ValidationError('Esta oferta está em apresentação. A identidade e o preço não podem ser alterados neste formulário.');
+  } else assertValidPrice(input.price);
   await assertSkuAvailable(input.guildId, input.sku, current.id);
 
   const slug =
-    input.name === current.name
+    input.name === current.name || isScriptPreview(current)
       ? current.slug
       : await uniqueSlug(input.guildId, input.name, current.id);
 
@@ -382,6 +383,11 @@ export async function updatePackFromInput(input: UpdatePackInput): Promise<Catal
   });
 
   return updated;
+}
+
+export async function updatePackTexts(input: Omit<UpdatePackInput, 'sku' | 'price'>): Promise<CatalogPack> {
+  const current = await requirePack(input.guildId, input.packId);
+  return updatePackFromInput({ ...input, sku: current.sku, price: current.price });
 }
 
 /** Altera somente o preco (caminho rapido do painel "Precos"). */

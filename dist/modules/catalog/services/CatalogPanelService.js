@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.publishCatalogPanel = publishCatalogPanel;
+exports.publishCatalogForum = publishCatalogForum;
 exports.refreshCatalogPanel = refreshCatalogPanel;
 exports.removeCatalogPanel = removeCatalogPanel;
 exports.ensureCatalogPanelHealthy = ensureCatalogPanelHealthy;
@@ -13,6 +14,7 @@ const GuildConfigService_1 = require("../../configuration/services/GuildConfigSe
 const CatalogBuilders_1 = require("../builders/CatalogBuilders");
 const CatalogCategoryService_1 = require("./CatalogCategoryService");
 const CatalogService_1 = require("./CatalogService");
+const CatalogForumService_1 = require("./CatalogForumService");
 /**
  * Painel publico do catalogo.
  *
@@ -34,7 +36,7 @@ async function buildPanel(guild) {
         (0, CatalogService_1.listVisiblePacks)(guild.id),
         (0, CatalogCategoryService_1.getEnabledCatalogCategories)(guild.id),
     ]);
-    return (0, CatalogBuilders_1.buildCatalogPanel)(config, { packs: packs.length, categories: categories.length });
+    return (0, CatalogBuilders_1.buildCatalogPanel)(config, { packs: packs.length, categories: categories.length, products: packs });
 }
 async function publishCatalogPanel(guild, channel) {
     return LockService_1.locks.withLock(LockService_1.LOCK_NAMESPACE.PANEL_UPDATE, panelKey(guild.id), async () => {
@@ -54,6 +56,12 @@ async function publishCatalogPanel(guild, channel) {
         return message;
     });
 }
+async function publishCatalogForum(guild, forumId) {
+    await LockService_1.locks.withLock(LockService_1.LOCK_NAMESPACE.PANEL_UPDATE, panelKey(guild.id), async () => {
+        await (0, CatalogForumService_1.syncCatalogForum)(guild.client.rest, guild.id, forumId, guild.client.user.id);
+        await (0, GuildConfigService_1.updateGuildConfig)(guild.id, { catalogChannelId: forumId, catalogMessageId: null });
+    });
+}
 /**
  * Reconstroi o painel editando a mensagem existente.
  * Se a mensagem foi apagada, republica e corrige a referencia — o operador nao
@@ -62,10 +70,16 @@ async function publishCatalogPanel(guild, channel) {
 async function refreshCatalogPanel(guild) {
     return LockService_1.locks.withLock(LockService_1.LOCK_NAMESPACE.PANEL_UPDATE, panelKey(guild.id), async () => {
         const config = await (0, GuildConfigService_1.getGuildConfig)(guild.id);
-        if (config.catalogChannelId === null || config.catalogMessageId === null) {
+        if (config.catalogChannelId === null) {
             return { updated: false, reason: 'Nenhum painel de catalogo publicado ainda.' };
         }
         const channel = await (0, discord_1.fetchChannelSafe)(guild, config.catalogChannelId);
+        if (channel?.type === discord_js_1.ChannelType.GuildForum) {
+            const result = await (0, CatalogForumService_1.syncCatalogForum)(guild.client.rest, guild.id, channel.id, guild.client.user.id);
+            return { updated: true, reason: `${result.threads.length} tópicos sincronizados.` };
+        }
+        if (config.catalogMessageId === null)
+            return { updated: false, reason: 'Nenhum painel publicado.' };
         if (!(0, discord_1.isSendableTextChannel)(channel)) {
             return {
                 updated: false,
@@ -127,7 +141,7 @@ async function removeCatalogPanel(guild) {
  */
 async function ensureCatalogPanelHealthy(guild) {
     const config = await (0, GuildConfigService_1.getGuildConfig)(guild.id);
-    if (config.catalogChannelId === null || config.catalogMessageId === null) {
+    if (config.catalogChannelId === null) {
         return { updated: false, reason: 'Painel do catalogo nunca foi publicado nesta guild.' };
     }
     return refreshCatalogPanel(guild);
