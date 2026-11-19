@@ -61,6 +61,8 @@ Em `/catalogo gerenciar`, escolha **Editar produto** uma única vez. O painel do
 
 Os tópicos mostram a capa e um resumo curto, com a indicação discreta de catálogo de apresentação no rodapé. **Ver detalhes** abre a descrição completa e o conteúdo incluído em uma resposta privada, sem encher a publicação principal. **Ver outras artes** abre a galeria privada; **Meus arquivos** consulta somente as licenças de quem clicou. Não há carrinho nem checkout para as quatro ofertas de apresentação. Em servidores com outro tipo de catálogo, a navegação anterior permanece disponível.
 
+A resposta **Ver detalhes** usa uma ficha com rótulos e espaços entre os blocos: coleção/produto, quantidade, conteúdo em lista, acesso, controle e instalação. Os nomes dos personagens aparecem em uma lista separada. Descrições personalizadas e campos editados pela equipe continuam sendo exibidos; o texto longo não é repetido na abertura da ficha.
+
 ## Pagamentos nesta etapa
 
 O catálogo mostra **Em breve · apresentação**. Os botões de compra não aparecem no card desses produtos. As verificações no servidor recusam compra e checkout, inclusive para carrinhos antigos e preços alterados no painel administrativo. Alterar apenas o preço não habilita a venda. Uma futura ativação de pagamentos exige implementar e revisar essa etapa explicitamente.

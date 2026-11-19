@@ -15,6 +15,15 @@ const presentation = {
     pelucias_base: { title: 'Sistema de pelúcias', summary: 'O sistema completo para organizar caixas, coleções e trocas. Sem coleção de brinde.', order: 2 },
     pelucias_dragoes: { title: 'Sistema + Dragões', summary: 'O sistema de pelúcias com seis dragões de brinde.', order: 3 },
 };
+const productFacts = {
+    companheiros_sanrio: { collection: true, quantity: '7', contents: ['Modelos e animações dos companheiros', 'Artes de perfil e corpo inteiro', 'Arte da box', 'Painel de controle /pet'] },
+    companheiros_monster_high: { collection: true, quantity: '10', contents: ['Modelos e animações das companheiras', 'Artes dos personagens', 'Arte da box', 'Painel de controle /pet'] },
+    pelucias_base: { collection: false, quantity: null, contents: ['Sistema de caixas, coleções e trocas', 'Painel administrativo', 'Artes dos dragões no menu', 'Guia de instalação e configuração'] },
+    pelucias_dragoes: { collection: false, quantity: '6', contents: ['Sistema completo de pelúcias', 'Modelos de dragões para equipar no corpo', 'Caixa e artes da coleção', 'Guia de instalação e configuração'] },
+};
+function labeled(label, value) {
+    return `**${label}:** ${value}`;
+}
 function display(pack) {
     const offer = scriptProducts_1.SCRIPT_CATALOG.find(value => value.sku === pack.sku || value.slug === pack.slug);
     if (!offer)
@@ -68,12 +77,39 @@ function buildScriptProductCard(view, requestedIndex, notice) {
     return root;
 }
 function buildScriptProductDetails(view) {
+    const { pack } = view;
+    const offer = scriptProducts_1.SCRIPT_CATALOG.find(value => value.sku === pack.sku || value.slug === pack.slug);
+    const facts = offer ? productFacts[offer.product] : undefined;
     const root = (0, v2_1.container)();
-    (0, v2_1.addHeader)(root, `${display(view.pack).title} · O que está incluído`);
-    root.addTextDisplayComponents((0, v2_1.text)((0, sanitize_1.truncate)(view.pack.description ?? view.pack.shortDescription ?? '', 1600)));
+    (0, v2_1.addHeader)(root, facts?.collection ? 'Ficha da coleção' : 'Ficha do produto');
+    const identity = [labeled(facts?.collection ? 'Coleção' : 'Produto', display(pack).title)];
+    const quantity = view.details.find(detail => detail.label === 'Personagens');
+    if (facts?.collection)
+        identity.push(labeled('Quantidade de companheiros', quantity?.value.match(/^\d+(?=\s|$)/u)?.[0] ?? quantity?.value ?? facts.quantity ?? 'Consulte o conteúdo'));
+    else if (facts?.quantity)
+        identity.push(labeled('Quantidade de pelúcias', facts.quantity));
+    else if (offer?.product === 'pelucias_base')
+        identity.push(labeled('Coleção incluída', 'Nenhuma. As coleções são instaladas separadamente.'));
+    root.addTextDisplayComponents((0, v2_1.text)(identity.join('\n\n')));
+    if (facts) {
+        root.addSeparatorComponents((0, v2_1.separator)({ divider: false }));
+        root.addTextDisplayComponents((0, v2_1.text)(`### Conteúdo\n${(0, v2_1.bullets)(facts.contents)}`));
+    }
     const details = view.details.filter(detail => !['Disponibilidade', 'Licença'].includes(detail.label)).slice(0, 6);
-    if (details.length)
-        root.addTextDisplayComponents((0, v2_1.text)(details.map(detail => `**${detail.label}:** ${(0, sanitize_1.truncate)(detail.value, 240)}`).join('\n')));
+    const sections = details.filter(detail => detail.label !== 'Personagens' || !facts?.collection)
+        .map(detail => labeled(detail.label === 'Modalidades' ? 'Modo de acesso' : detail.label, (0, sanitize_1.truncate)(detail.value, 240)));
+    if (offer && pack.description === offer.description && facts?.collection) {
+        const names = pack.description.split('.')[0]?.split(/,\s*|\s+e\s+/).filter(Boolean) ?? [];
+        if (names.length)
+            sections.push(`### Personagens\n${(0, v2_1.bullets)(names)}`);
+    }
+    else if (pack.description && (!offer || pack.description !== offer.description)) {
+        sections.push(`### Descrição\n${(0, sanitize_1.truncate)(pack.description, 1600).replace(/([.!?])\s+(?=[A-ZÀ-Ý])/gu, '$1\n\n')}`);
+    }
+    if (sections.length) {
+        root.addSeparatorComponents((0, v2_1.separator)({ divider: false }));
+        root.addTextDisplayComponents((0, v2_1.text)(sections.join('\n\n')));
+    }
     root.addActionRowComponents((0, v2_1.buttonRow)(button(customIds_1.CATALOG_ACTION.PACK_VIEW, 'Voltar ao produto', view.pack.id, '0'), button(customIds_1.CATALOG_ACTION.HOME, 'Todas as opções')));
     root.addTextDisplayComponents((0, v2_1.footerNote)('Compras ainda não disponíveis.'));
     return root;

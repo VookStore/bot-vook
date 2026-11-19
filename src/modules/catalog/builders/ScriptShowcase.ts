@@ -1,7 +1,7 @@
 import { ButtonBuilder, ButtonStyle, type ContainerBuilder } from 'discord.js';
 import type { CatalogPack } from '@prisma/client';
 import { CATALOG_ACTION, LICENSE_ACTION, NAMESPACE, buildCustomId } from '../../../constants/customIds';
-import { addHeader, buttonRow, container, footerNote, mediaGallery, sectionWithButton, text } from '../../../components/v2';
+import { addHeader, bullets, buttonRow, container, footerNote, mediaGallery, sectionWithButton, separator, text } from '../../../components/v2';
 import { truncate } from '../../../utils/sanitize';
 import { SCRIPT_CATALOG, isScriptPreview } from '../scriptProducts';
 import type { PackView } from '../types/catalog';
@@ -12,6 +12,17 @@ const presentation = {
     pelucias_base: { title: 'Sistema de pelúcias', summary: 'O sistema completo para organizar caixas, coleções e trocas. Sem coleção de brinde.', order: 2 },
     pelucias_dragoes: { title: 'Sistema + Dragões', summary: 'O sistema de pelúcias com seis dragões de brinde.', order: 3 },
 } as const;
+
+const productFacts = {
+    companheiros_sanrio: { collection: true, quantity: '7', contents: ['Modelos e animações dos companheiros', 'Artes de perfil e corpo inteiro', 'Arte da box', 'Painel de controle /pet'] },
+    companheiros_monster_high: { collection: true, quantity: '10', contents: ['Modelos e animações das companheiras', 'Artes dos personagens', 'Arte da box', 'Painel de controle /pet'] },
+    pelucias_base: { collection: false, quantity: null, contents: ['Sistema de caixas, coleções e trocas', 'Painel administrativo', 'Artes dos dragões no menu', 'Guia de instalação e configuração'] },
+    pelucias_dragoes: { collection: false, quantity: '6', contents: ['Sistema completo de pelúcias', 'Modelos de dragões para equipar no corpo', 'Caixa e artes da coleção', 'Guia de instalação e configuração'] },
+} as const;
+
+function labeled(label: string, value: string): string {
+    return `**${label}:** ${value}`;
+}
 
 function display(pack: CatalogPack) {
     const offer = SCRIPT_CATALOG.find(value => value.sku === pack.sku || value.slug === pack.slug);
@@ -68,11 +79,34 @@ export function buildScriptProductCard(view: PackView, requestedIndex: number, n
 }
 
 export function buildScriptProductDetails(view: PackView): ContainerBuilder {
+    const { pack } = view;
+    const offer = SCRIPT_CATALOG.find(value => value.sku === pack.sku || value.slug === pack.slug);
+    const facts = offer ? productFacts[offer.product] : undefined;
     const root = container();
-    addHeader(root, `${display(view.pack).title} · O que está incluído`);
-    root.addTextDisplayComponents(text(truncate(view.pack.description ?? view.pack.shortDescription ?? '', 1600)));
+    addHeader(root, facts?.collection ? 'Ficha da coleção' : 'Ficha do produto');
+    const identity = [labeled(facts?.collection ? 'Coleção' : 'Produto', display(pack).title)];
+    const quantity = view.details.find(detail => detail.label === 'Personagens');
+    if (facts?.collection) identity.push(labeled('Quantidade de companheiros', quantity?.value.match(/^\d+(?=\s|$)/u)?.[0] ?? quantity?.value ?? facts.quantity ?? 'Consulte o conteúdo'));
+    else if (facts?.quantity) identity.push(labeled('Quantidade de pelúcias', facts.quantity));
+    else if (offer?.product === 'pelucias_base') identity.push(labeled('Coleção incluída', 'Nenhuma. As coleções são instaladas separadamente.'));
+    root.addTextDisplayComponents(text(identity.join('\n\n')));
+    if (facts) {
+        root.addSeparatorComponents(separator({ divider: false }));
+        root.addTextDisplayComponents(text(`### Conteúdo\n${bullets(facts.contents)}`));
+    }
     const details = view.details.filter(detail => !['Disponibilidade', 'Licença'].includes(detail.label)).slice(0, 6);
-    if (details.length) root.addTextDisplayComponents(text(details.map(detail => `**${detail.label}:** ${truncate(detail.value, 240)}`).join('\n')));
+    const sections = details.filter(detail => detail.label !== 'Personagens' || !facts?.collection)
+        .map(detail => labeled(detail.label === 'Modalidades' ? 'Modo de acesso' : detail.label, truncate(detail.value, 240)));
+    if (offer && pack.description === offer.description && facts?.collection) {
+        const names = pack.description.split('.')[0]?.split(/,\s*|\s+e\s+/).filter(Boolean) ?? [];
+        if (names.length) sections.push(`### Personagens\n${bullets(names)}`);
+    } else if (pack.description && (!offer || pack.description !== offer.description)) {
+        sections.push(`### Descrição\n${truncate(pack.description, 1600).replace(/([.!?])\s+(?=[A-ZÀ-Ý])/gu, '$1\n\n')}`);
+    }
+    if (sections.length) {
+        root.addSeparatorComponents(separator({ divider: false }));
+        root.addTextDisplayComponents(text(sections.join('\n\n')));
+    }
     root.addActionRowComponents(buttonRow(
         button(CATALOG_ACTION.PACK_VIEW, 'Voltar ao produto', view.pack.id, '0'),
         button(CATALOG_ACTION.HOME, 'Todas as opções'),
